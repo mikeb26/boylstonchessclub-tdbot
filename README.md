@@ -16,3 +16,6 @@ Available Commands:
                          event.
 ```
 
+# Installing into your Discord Server
+
+https://discord.com/oauth2/authorize?client_id=1381308091169243227&permissions=274877908992&integration_type=0&scope=bot+applications.commands

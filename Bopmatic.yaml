@@ -3,6 +3,7 @@ project:
   name: "boylstonchessclub-tdbot"
   id: "proj-a3698921c9b114c3"
   desc: "Tournament & player information bot for the Boylston Chess Club (https://boylstonchess.org/)"
+  sitedir: "site_assets"
   services:
   - name: "DiscordBot"
     desc: "Service for executing discord slash commands"
