@@ -1,0 +1,3 @@
+Tournament & player information bot for the Boylston Chess Club (https://boylstonchess.org/)
+
+https://github.com/mikeb26/boylstonchessclub-tdbot

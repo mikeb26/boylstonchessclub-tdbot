@@ -1,8 +1,4 @@
-# boylstonchessclub-tdbot
-Tournament & player information bot for the Boylston Chess Club
-(https://boylstonchess.org/)
-
-# Usage 
+Boylston Chess Club TD Bot Help
 
 Available Commands:
 ```
@@ -15,4 +11,3 @@ Available Commands:
   /td event <eventId>    Retrieve detailed information regarding an
                          event.
 ```
-

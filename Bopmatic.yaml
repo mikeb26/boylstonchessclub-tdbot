@@ -1,0 +1,13 @@
+formatversion: "1.1"
+project:
+  name: "boylstonchessclub-tdbot"
+  id: "proj-a3698921c9b114c3"
+  desc: "Tournament & player information bot for the Boylston Chess Club (https://boylstonchess.org/)"
+  services:
+  - name: "DiscordBot"
+    desc: "Service for executing discord slash commands"
+    apidef: "openapi/discord.json"
+    port: 8080
+    executable: "discordbot"
+    user_access: "anon_public"
+  buildcmd: "make"
