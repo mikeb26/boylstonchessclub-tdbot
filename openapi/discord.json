@@ -9,7 +9,7 @@
       "post": {
         "responses": {
           "200": {
-            "description": ""
+            "description": "see https://discord.com/developers/docs/interactions/receiving-and-responding"
           }
         }
       }
