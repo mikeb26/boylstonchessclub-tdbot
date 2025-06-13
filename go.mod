@@ -6,6 +6,7 @@ toolchain go1.23.10
 
 require (
 	github.com/PuerkitoBio/goquery v1.10.3
+	github.com/araddon/dateparse v0.0.0-20210429162001-6b43995a97de
 	github.com/bwmarrin/discordgo v0.29.0
 	golang.org/x/sync v0.15.0
 )

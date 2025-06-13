@@ -14,6 +14,9 @@ discordbot: vendor FORCE
 pairings: vendor FORCE
 	go build github.com/mikeb26/boylstonchessclub-tdbot/cmd/pairings
 
+test: build FORCE
+	go test github.com/mikeb26/boylstonchessclub-tdbot/cmd/discordbot
+
 .PHONY: deps
 deps:
 	rm -rf go.mod go.sum vendor
