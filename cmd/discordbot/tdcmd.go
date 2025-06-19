@@ -18,18 +18,19 @@ import (
 type TdSubCommand string
 
 const (
-	TdAboutCmd TdSubCommand = "about"
-	TdHelpCmd  TdSubCommand = "help"
-	TdCalCmd   TdSubCommand = "cal"
-	TdEventCmd TdSubCommand = "event"
-	// pairings is a work in progress; see ../pairings
+	TdAboutCmd    TdSubCommand = "about"
+	TdHelpCmd     TdSubCommand = "help"
+	TdCalCmd      TdSubCommand = "cal"
+	TdEventCmd    TdSubCommand = "event"
+	TdPairingsCmd TdSubCommand = "pairings"
 )
 
 var tdSubCmdHdlrs = map[TdSubCommand]CmdHandler{
-	TdAboutCmd: tdAboutCmdHandler,
-	TdHelpCmd:  tdHelpCmdHandler,
-	TdCalCmd:   tdCalCmdHandler,
-	TdEventCmd: tdEventCmdHandler,
+	TdAboutCmd:    tdAboutCmdHandler,
+	TdHelpCmd:     tdHelpCmdHandler,
+	TdCalCmd:      tdCalCmdHandler,
+	TdEventCmd:    tdEventCmdHandler,
+	TdPairingsCmd: tdPairingsCmdHandler,
 }
 
 func tdCmdHandler(inter *discordgo.Interaction) *discordgo.InteractionResponse {
@@ -181,4 +182,138 @@ func tdEventCmdHandler(inter *discordgo.Interaction) *discordgo.InteractionRespo
 	resp.Data.Content = sb.String()
 
 	return resp
+}
+
+// tdPairingsCmdHandler handles the /td pairings command to display current pairings
+func tdPairingsCmdHandler(inter *discordgo.Interaction) *discordgo.InteractionResponse {
+	resp := &discordgo.InteractionResponse{
+		Type: discordgo.InteractionResponseChannelMessageWithSource,
+		Data: &discordgo.InteractionResponseData{},
+	}
+	data := inter.ApplicationCommandData()
+	if len(data.Options) == 0 || len(data.Options[0].Options) == 0 {
+		resp.Data.Content = "Please provide an event ID."
+		return resp
+	}
+	eventIDStr := data.Options[0].Options[0].StringValue()
+	id, err := strconv.Atoi(eventIDStr)
+	if err != nil {
+		resp.Data.Content = "Please provide a valid event ID."
+		return resp
+	}
+	tourney, err := getBccTournament(id)
+	if err != nil {
+		resp.Data.Content = fmt.Sprintf("Error fetching pairings for event %d: %v", id, err)
+		return resp
+	}
+	if len(tourney.CurrentPairings) == 0 {
+		resp.Data.Content = fmt.Sprintf("No pairings found for event %d.", id)
+		return resp
+	}
+	resp.Data.Content = buildPairingsOutput(tourney.CurrentPairings)
+	return resp
+}
+
+// buildPairingsOutput formats pairings into grouped, aligned string output
+func buildPairingsOutput(pairings []Pairing) string {
+	// Group pairings by section
+	sections := make(map[string][]Pairing)
+	for _, p := range pairings {
+		sections[p.Section] = append(sections[p.Section], p)
+	}
+	// Sort section names using custom criteria
+	var sectionNames []string
+	for sec := range sections {
+		sectionNames = append(sectionNames, sec)
+	}
+	// Use named sectionSorter instead of anonymous comparator
+	sort.Sort(sectionSorter(sectionNames))
+	var sb strings.Builder
+
+	for _, sec := range sectionNames {
+		list := sections[sec]
+		// Sort by board number
+		sort.Slice(list, func(i, j int) bool {
+			return list[i].BoardNumber < list[j].BoardNumber
+		})
+
+		type row struct{ board, white, black string }
+		var rows []row
+		for _, p := range list {
+			b := fmt.Sprintf("%d.", p.BoardNumber)
+			var w, bl string
+			if p.IsByePairing {
+				w = fmt.Sprintf("%s(%d) has a bye", p.WhitePlayer.DisplayName,
+					p.WhitePlayer.PrimaryRating)
+				bl = ""
+			} else {
+				w = fmt.Sprintf("%s(%d)", p.WhitePlayer.DisplayName,
+					p.WhitePlayer.PrimaryRating)
+				bl = fmt.Sprintf("%s(%d)", p.BlackPlayer.DisplayName,
+					p.BlackPlayer.PrimaryRating)
+			}
+			rows = append(rows, row{board: b, white: w, black: bl})
+		}
+
+		// Compute column widths
+		maxB, maxW, maxBl := len("Board"), len("White"), len("Black")
+		for _, r := range rows {
+			if l := len(r.board); l > maxB {
+				maxB = l
+			}
+			if l := len(r.white); l > maxW {
+				maxW = l
+			}
+			if l := len(r.black); l > maxBl {
+				maxBl = l
+			}
+		}
+
+		// Write section header and table
+		sb.WriteString(fmt.Sprintf("%s Section\n", sec))
+		sb.WriteString(fmt.Sprintf("%-*s  %-*s  %-*s\n", maxB, "Board", maxW,
+			"White", maxBl, "Black"))
+		for _, r := range rows {
+			sb.WriteString(fmt.Sprintf("%-*s  %-*s  %-*s\n", maxB, r.board,
+				maxW, r.white, maxBl, r.black))
+		}
+		sb.WriteString("\n")
+	}
+	// Wrap output in code block for monospace formatting in Discord
+	return fmt.Sprintf("```\n%s```", sb.String())
+}
+
+// sectionSorter implements sort.Interface for custom section ordering
+// Order: "Open" first, then U<Number> sections descending by number, then
+// others lexicographically
+type sectionSorter []string
+
+func (s sectionSorter) Len() int { return len(s) }
+
+func (s sectionSorter) Swap(i, j int) { s[i], s[j] = s[j], s[i] }
+
+func (s sectionSorter) Less(i, j int) bool {
+	a, b := s[i], s[j]
+	// "Open" always first
+	if a == "Open" && b != "Open" {
+		return true
+	}
+	if b == "Open" && a != "Open" {
+		return false
+	}
+	ua, ub := strings.HasPrefix(a, "U"), strings.HasPrefix(b, "U")
+	// Both U-sections: compare numeric suffix descending
+	if ua && ub {
+		ai, errA := strconv.Atoi(strings.TrimPrefix(a, "U"))
+		bi, errB := strconv.Atoi(strings.TrimPrefix(b, "U"))
+		if errA == nil && errB == nil {
+			return ai > bi
+		}
+	}
+	// U-sections before non-U (after Open)
+	if ua != ub {
+		return ua
+	}
+	// Fallback lexicographical
+	return a < b
 }

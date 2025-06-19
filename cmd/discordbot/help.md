@@ -10,4 +10,5 @@ Available Commands:
                          specified).
   /td event <eventId>    Retrieve detailed information regarding an
                          event.
+  /td pairings <eventId> Display current pairings for a tournament, grouped by section
 ```

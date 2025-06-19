@@ -201,6 +201,19 @@ func registerSlashCommands() {
 					},
 				},
 			},
+			{
+				Type:        discordgo.ApplicationCommandOptionSubCommand,
+				Name:        string(TdPairingsCmd),
+				Description: "Get current pairings for an event",
+				Options: []*discordgo.ApplicationCommandOption{
+					{
+						Type:        discordgo.ApplicationCommandOptionString,
+						Name:        "eventid",
+						Description: "Event id of the tournament (as returned by cal)",
+						Required:    true,
+					},
+				},
+			},
 		},
 	}
 
