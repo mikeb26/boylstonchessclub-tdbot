@@ -44,8 +44,8 @@ func TestTdEventCmdHandler(t *testing.T) {
 		Data: discordgo.ApplicationCommandInteractionData{
 			Options: []*discordgo.ApplicationCommandInteractionDataOption{
 				{
-					Name:    "event",
-					Type:    discordgo.ApplicationCommandOptionSubCommand,
+					Name: "event",
+					Type: discordgo.ApplicationCommandOptionSubCommand,
 					Options: []*discordgo.ApplicationCommandInteractionDataOption{
 						{
 							Name:  "eventID",
@@ -66,9 +66,12 @@ func TestTdEventCmdHandler(t *testing.T) {
 		t.Fatal("Expected non-nil Data in response")
 	}
 
-	content := resp.Data.Content
+	if len(resp.Data.Embeds) != 1 {
+		t.Fatal("Expected 1 embed in response")
+	}
+	title := resp.Data.Embeds[0].Title
 	// Expect that the event title 'Big Money Swiss' appears in the output
-	if !strings.Contains(content, "Big Money Swiss") {
-		t.Errorf("Expected response content to contain 'Big Money Swiss', got %q", content)
+	if !strings.Contains(title, "Big Money Swiss") {
+		t.Errorf("Expected response content to contain 'Big Money Swiss', got %q", title)
 	}
 }
