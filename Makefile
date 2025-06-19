@@ -11,9 +11,6 @@ vendor: go.mod
 discordbot: vendor FORCE
 	go build github.com/mikeb26/boylstonchessclub-tdbot/cmd/discordbot
 
-pairings: vendor FORCE
-	go build github.com/mikeb26/boylstonchessclub-tdbot/cmd/pairings
-
 test: build FORCE
 	go test github.com/mikeb26/boylstonchessclub-tdbot/cmd/discordbot
 
@@ -26,6 +23,6 @@ deps:
 
 .PHONY: clean
 clean:
-	rm -rf discordbot pairings
+	rm -rf discordbot
 
 FORCE:

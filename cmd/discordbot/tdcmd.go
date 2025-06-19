@@ -210,12 +210,13 @@ func tdPairingsCmdHandler(inter *discordgo.Interaction) *discordgo.InteractionRe
 		resp.Data.Content = fmt.Sprintf("No pairings found for event %d.", id)
 		return resp
 	}
-	resp.Data.Content = buildPairingsOutput(tourney.CurrentPairings)
+	resp.Data.Content = buildPairingsOutput(tourney.IsPredicted(),
+		tourney.CurrentPairings)
 	return resp
 }
 
 // buildPairingsOutput formats pairings into grouped, aligned string output
-func buildPairingsOutput(pairings []Pairing) string {
+func buildPairingsOutput(isPredicted bool, pairings []Pairing) string {
 	// Group pairings by section
 	sections := make(map[string][]Pairing)
 	for _, p := range pairings {
@@ -230,25 +231,44 @@ func buildPairingsOutput(pairings []Pairing) string {
 	sort.Sort(sectionSorter(sectionNames))
 	var sb strings.Builder
 
+	sb.WriteString("* Please note that pairings are tentative and subject to change before the start of the round.\n\n")
+
+	if len(pairings) > 0 {
+		if isPredicted {
+			sb.WriteString(fmt.Sprintf("Round %v pairings are not yet posted, but here are my predicted round %v pairings:\n\n",
+				pairings[0].RoundNumber, pairings[0].RoundNumber))
+		} else {
+			sb.WriteString(fmt.Sprintf("Posted Round %v Pairings:\n\n",
+				pairings[0].RoundNumber))
+		}
+	} else {
+		sb.WriteString("No pairings posted nor predicted")
+	}
+
 	for _, sec := range sectionNames {
 		list := sections[sec]
 		// Sort by board number
 		sort.Slice(list, func(i, j int) bool {
-			return list[i].BoardNumber < list[j].BoardNumber
+			// 0 means bye
+			return list[i].BoardNumber != 0 &&
+				list[i].BoardNumber < list[j].BoardNumber
 		})
 
 		type row struct{ board, white, black string }
 		var rows []row
 		for _, p := range list {
-			b := fmt.Sprintf("%d.", p.BoardNumber)
-			var w, bl string
+			var w, b, bl string
+			w = fmt.Sprintf("%s(%d)", p.WhitePlayer.DisplayName,
+				p.WhitePlayer.PrimaryRating)
 			if p.IsByePairing {
-				w = fmt.Sprintf("%s(%d) has a bye", p.WhitePlayer.DisplayName,
-					p.WhitePlayer.PrimaryRating)
-				bl = ""
+				b = "n/a"
+				if p.WhitePoints != nil && *p.WhitePoints == 1.0 {
+					bl = "BYE(1.0)"
+				} else {
+					bl = "BYE(0.5)"
+				}
 			} else {
-				w = fmt.Sprintf("%s(%d)", p.WhitePlayer.DisplayName,
-					p.WhitePlayer.PrimaryRating)
+				b = fmt.Sprintf("%d.", p.BoardNumber)
 				bl = fmt.Sprintf("%s(%d)", p.BlackPlayer.DisplayName,
 					p.BlackPlayer.PrimaryRating)
 			}
@@ -270,7 +290,12 @@ func buildPairingsOutput(pairings []Pairing) string {
 		}
 
 		// Write section header and table
-		sb.WriteString(fmt.Sprintf("%s Section\n", sec))
+		if len(sectionNames) > 1 {
+			if sec == "" {
+				sec = "UNNAMED"
+			}
+			sb.WriteString(fmt.Sprintf("%s Section\n", sec))
+		}
 		sb.WriteString(fmt.Sprintf("%-*s  %-*s  %-*s\n", maxB, "Board", maxW,
 			"White", maxBl, "Black"))
 		for _, r := range rows {

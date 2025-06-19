@@ -8,6 +8,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/araddon/dateparse"
@@ -76,6 +78,8 @@ type Entry struct {
 type Tournament struct {
 	Players         []Player  `json:"players"`
 	CurrentPairings []Pairing `json:"currentPairings"`
+
+	isPredicted bool
 }
 
 // Player represents a participant in the tournament.
@@ -176,30 +180,89 @@ func getBccEventDetail(eventId int) (EventDetail, error) {
 	return detail, nil
 }
 
-// getBccTournament fetches the tournament data (players and pairings) for a given eventId.
+// getBccTournament fetches the tournament data (players and pairings) for a
+// given eventId.
 func getBccTournament(eventId int) (Tournament, error) {
-	url := fmt.Sprintf("https://beta.boylstonchess.org/api/event/%d/tournament", eventId)
+	url := fmt.Sprintf("https://beta.boylstonchess.org/api/event/%d/tournament",
+		eventId)
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
-		return Tournament{}, fmt.Errorf("unable to fetch bcc tournament (new): %w", err)
+		return Tournament{}, fmt.Errorf("unable to fetch bcc tournament (new): %w",
+			err)
 	}
 	req.Header.Set("User-Agent", UserAgent)
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return Tournament{}, fmt.Errorf("unable to fetch bcc tournament (do): %w", err)
+		return Tournament{}, fmt.Errorf("unable to fetch bcc tournament (do): %w",
+			err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return Tournament{}, fmt.Errorf("unable to fetch bcc tournament (http): %v", resp.StatusCode)
+		detail, err := getBccEventDetail(eventId)
+		if err == nil {
+			return eventDetailToTournament(detail)
+		} else {
+			err = fmt.Errorf("unable to fetch %v: http status: %v", url,
+				resp.StatusCode)
+		}
+
+		return Tournament{}, err
 	}
 
 	var tourney Tournament
 	if err := json.NewDecoder(resp.Body).Decode(&tourney); err != nil {
-		return Tournament{}, fmt.Errorf("unable to parse bcc tournament: %w", err)
+		return Tournament{}, fmt.Errorf("unable to parse bcc tournament: %w",
+			err)
 	}
 	return tourney, nil
+}
+
+func eventDetailToTournament(eventDetail EventDetail) (Tournament, error) {
+	// Build tournament players list from event details entries
+	tourney := Tournament{}
+	for _, entry := range eventDetail.Entries {
+		tourney.Players = append(tourney.Players, entryToPlayer(entry))
+	}
+
+	tourney.CurrentPairings = predictRound1Pairings(eventDetail.Entries)
+	tourney.isPredicted = true
+
+	return tourney, nil
+}
+
+func (t Tournament) IsPredicted() bool {
+	return t.isPredicted
+}
+
+func strRatingToInt(rating string) int {
+	r := 0
+	if rating != "" {
+		// handle formats like "559/24"
+		if idx := strings.Index(rating, "/"); idx != -1 {
+			rating = rating[:idx]
+		}
+		if v, err := strconv.Atoi(strings.TrimSpace(rating)); err == nil {
+			r = v
+		}
+	}
+
+	return r
+}
+
+func entryToPlayer(entry Entry) Player {
+	displayName := fmt.Sprintf("%s %s", entry.FirstName, entry.LastName)
+
+	return Player{
+		FirstName:       entry.FirstName,
+		LastName:        entry.LastName,
+		NameTitle:       entry.ChessTitle,
+		DisplayName:     displayName,
+		UscfID:          entry.UscfID,
+		PrimaryRating:   strRatingToInt(entry.PrimaryRating),
+		SecondaryRating: strRatingToInt(entry.SecondaryRating),
+	}
 }
 
 // Custom unmarshaller to handle non-RFC3339 timestamps, "null", and empty strings.
