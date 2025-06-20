@@ -100,7 +100,7 @@ type Player struct {
 	LiveRatingProvo      int     `json:"liveRatingProvo"`
 	PostEventRating      int     `json:"postEventRating"`
 	PostEventRatingProvo int     `json:"postEventRatingProvo"`
-	PostEventBonusPoints int     `json:"postEventBonusPoints"`
+	PostEventBonusPoints float64 `json:"postEventBonusPoints"`
 	RatingChange         int     `json:"ratingChange"`
 	PairingNumber        int     `json:"pairingNumber"`
 	CurrentScore         float64 `json:"currentScore"`
