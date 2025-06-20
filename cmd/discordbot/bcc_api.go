@@ -84,27 +84,30 @@ type Tournament struct {
 
 // Player represents a participant in the tournament.
 type Player struct {
-	FirstName            string `json:"firstName"`
-	MiddleName           string `json:"middleName"`
-	LastName             string `json:"lastName"`
-	NameTitle            string `json:"nameTitle"`
-	NameSuffix           string `json:"nameSuffix"`
-	ChessTitle           string `json:"chessTitle"`
-	DisplayName          string `json:"displayName"`
-	UscfID               int    `json:"uscfId"`
-	FideID               int    `json:"fideId"`
-	FideCountry          string `json:"fideCountry"`
-	PrimaryRating        int    `json:"primaryRating"`
-	SecondaryRating      int    `json:"secondaryRating"`
-	LiveRating           int    `json:"liveRating"`
-	LiveRatingProvo      int    `json:"liveRatingProvo"`
-	PostEventRating      int    `json:"postEventRating"`
-	PostEventRatingProvo int    `json:"postEventRatingProvo"`
-	PostEventBonusPoints int    `json:"postEventBonusPoints"`
-	RatingChange         int    `json:"ratingChange"`
-	PairingNumber        int    `json:"pairingNumber"`
-	Place                string `json:"place"`
-	PlaceNumber          int    `json:"placeNumber"`
+	FirstName            string  `json:"firstName"`
+	MiddleName           string  `json:"middleName"`
+	LastName             string  `json:"lastName"`
+	NameTitle            string  `json:"nameTitle"`
+	NameSuffix           string  `json:"nameSuffix"`
+	ChessTitle           string  `json:"chessTitle"`
+	DisplayName          string  `json:"displayName"`
+	UscfID               int     `json:"uscfId"`
+	FideID               int     `json:"fideId"`
+	FideCountry          string  `json:"fideCountry"`
+	PrimaryRating        int     `json:"primaryRating"`
+	SecondaryRating      int     `json:"secondaryRating"`
+	LiveRating           int     `json:"liveRating"`
+	LiveRatingProvo      int     `json:"liveRatingProvo"`
+	PostEventRating      int     `json:"postEventRating"`
+	PostEventRatingProvo int     `json:"postEventRatingProvo"`
+	PostEventBonusPoints int     `json:"postEventBonusPoints"`
+	RatingChange         int     `json:"ratingChange"`
+	PairingNumber        int     `json:"pairingNumber"`
+	CurrentScore         float64 `json:"currentScore"`
+	CurrentScoreAG       float64 `json:"currentScoreAfterGame"`
+	GamesCompleted       int     `json:"gamesCompleted"`
+	Place                string  `json:"place"`
+	PlaceNumber          int     `json:"placeNumber"`
 }
 
 // Pairing represents a single board pairing in the tournament.

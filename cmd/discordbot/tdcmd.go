@@ -319,8 +319,8 @@ func buildPairingsOutput(isPredicted bool, pairings []Pairing) string {
 		var rows []row
 		for _, p := range list {
 			var w, b, bl string
-			w = fmt.Sprintf("%s(%d)", p.WhitePlayer.DisplayName,
-				p.WhitePlayer.PrimaryRating)
+			w = fmt.Sprintf("%s(%d %.1f)", p.WhitePlayer.DisplayName,
+				p.WhitePlayer.PrimaryRating, p.WhitePlayer.CurrentScore)
 			if p.IsByePairing {
 				b = "n/a"
 				if p.WhitePoints != nil && *p.WhitePoints == 1.0 {
@@ -330,8 +330,8 @@ func buildPairingsOutput(isPredicted bool, pairings []Pairing) string {
 				}
 			} else {
 				b = fmt.Sprintf("%d.", p.BoardNumber)
-				bl = fmt.Sprintf("%s(%d)", p.BlackPlayer.DisplayName,
-					p.BlackPlayer.PrimaryRating)
+				bl = fmt.Sprintf("%s(%d %.1f)", p.BlackPlayer.DisplayName,
+					p.BlackPlayer.PrimaryRating, p.BlackPlayer.CurrentScore)
 			}
 			rows = append(rows, row{board: b, white: w, black: bl})
 		}
