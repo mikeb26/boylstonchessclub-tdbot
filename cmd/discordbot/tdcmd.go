@@ -18,19 +18,21 @@ import (
 type TdSubCommand string
 
 const (
-	TdAboutCmd    TdSubCommand = "about"
-	TdHelpCmd     TdSubCommand = "help"
-	TdCalCmd      TdSubCommand = "cal"
-	TdEventCmd    TdSubCommand = "event"
-	TdPairingsCmd TdSubCommand = "pairings"
+	TdAboutCmd     TdSubCommand = "about"
+	TdHelpCmd      TdSubCommand = "help"
+	TdCalCmd       TdSubCommand = "cal"
+	TdEventCmd     TdSubCommand = "event"
+	TdPairingsCmd  TdSubCommand = "pairings"
+	TdStandingsCmd TdSubCommand = "standings"
 )
 
 var tdSubCmdHdlrs = map[TdSubCommand]CmdHandler{
-	TdAboutCmd:    tdAboutCmdHandler,
-	TdHelpCmd:     tdHelpCmdHandler,
-	TdCalCmd:      tdCalCmdHandler,
-	TdEventCmd:    tdEventCmdHandler,
-	TdPairingsCmd: tdPairingsCmdHandler,
+	TdAboutCmd:     tdAboutCmdHandler,
+	TdHelpCmd:      tdHelpCmdHandler,
+	TdCalCmd:       tdCalCmdHandler,
+	TdEventCmd:     tdEventCmdHandler,
+	TdPairingsCmd:  tdPairingsCmdHandler,
+	TdStandingsCmd: tdStandingsCmdHandler,
 }
 
 func tdCmdHandler(inter *discordgo.Interaction) *discordgo.InteractionResponse {
@@ -266,8 +268,7 @@ func tdPairingsCmdHandler(inter *discordgo.Interaction) *discordgo.InteractionRe
 			eventID)
 		return resp
 	}
-	resp.Data.Content = buildPairingsOutput(tourney.IsPredicted(),
-		tourney.CurrentPairings)
+	resp.Data.Content = buildPairingsOutput(tourney)
 
 	if broadcast {
 		resp.Data.Flags = 0
@@ -276,11 +277,143 @@ func tdPairingsCmdHandler(inter *discordgo.Interaction) *discordgo.InteractionRe
 	return resp
 }
 
+// buildStandingsOutput formats standings into grouped, aligned string output
+func buildStandingsOutput(t *Tournament) string {
+	if len(t.CurrentPairings) == 0 {
+		return "Cannot determine standings without current pairings"
+	}
+	secPlayers := getPlayersBySection(t)
+	// Sort section names using custom criteria
+	var sectionNames []string
+	for sec := range secPlayers {
+		sectionNames = append(sectionNames, sec)
+	}
+	// Use named sectionSorter instead of anonymous comparator
+	sort.Sort(sectionSorter(sectionNames))
+	var sb strings.Builder
+
+	for sec, players := range secPlayers {
+		sort.Slice(players, func(i, j int) bool {
+			return players[i].PlaceNumber < players[j].PlaceNumber
+		})
+
+		type row struct{ rank, player, score string }
+		var rows []row
+		priorScore := -1.0
+		for idx, p := range players {
+			var rank string
+			if idx != 0 && p.CurrentScoreAG == priorScore {
+				rank = ""
+			} else {
+				rank = fmt.Sprintf("%v.", p.PlaceNumber)
+				priorScore = p.CurrentScoreAG
+			}
+			r := row{
+				rank:   rank,
+				player: p.DisplayName,
+				score:  fmt.Sprintf("%.1f", p.CurrentScoreAG),
+			}
+			rows = append(rows, r)
+		}
+
+		// Compute column widths
+		maxP, maxN, maxS := len("Place"), len("Name"), len("Score")
+		for _, r := range rows {
+			if l := len(r.rank); l > maxP {
+				maxP = l
+			}
+			if l := len(r.player); l > maxN {
+				maxN = l
+			}
+			if l := len(r.score); l > maxS {
+				maxS = l
+			}
+		}
+
+		// Write section header and table
+		if len(sectionNames) > 1 {
+			if sec == "" {
+				sec = "UNNAMED"
+			}
+			sb.WriteString(fmt.Sprintf("%s Section\n", sec))
+		}
+		sb.WriteString(fmt.Sprintf("%-*s  %-*s  %-*s\n", maxP, "Place", maxN,
+			"Name", maxS, "Score"))
+		for _, r := range rows {
+			sb.WriteString(fmt.Sprintf("%-*s  %-*s  %-*s\n", maxP, r.rank,
+				maxN, r.player, maxS, r.score))
+		}
+		sb.WriteString("\n")
+	}
+	// Wrap output in code block for monospace formatting in Discord
+	return fmt.Sprintf("```\n%s```", sb.String())
+}
+
+// tdStandingsCmdHandler handles the /td pairings command to display current
+// standings
+func tdStandingsCmdHandler(inter *discordgo.Interaction) *discordgo.InteractionResponse {
+	resp := &discordgo.InteractionResponse{
+		Type: discordgo.InteractionResponseChannelMessageWithSource,
+		Data: &discordgo.InteractionResponseData{
+			Flags: discordgo.MessageFlagsEphemeral,
+		},
+	}
+	data := inter.ApplicationCommandData()
+	broadcast := false // default
+	var eventID int64
+	if len(data.Options) > 0 {
+		found := false
+		for _, opt := range data.Options[0].Options {
+			if opt.Name == "eventid" {
+				eventID = opt.IntValue()
+				found = true
+			} else if opt.Name == "broadcast" {
+				broadcast = opt.BoolValue()
+			}
+		}
+		if !found {
+			resp.Data.Content = "Please provide an event ID."
+			return resp
+		}
+	} else {
+		resp.Data.Content = "Please provide an event ID."
+		return resp
+	}
+	tourney, err := getBccTournament(eventID)
+	if err != nil {
+		resp.Data.Content = fmt.Sprintf("Error fetching standings for event %d: %v",
+			eventID, err)
+		return resp
+	}
+
+	resp.Data.Content = buildStandingsOutput(tourney)
+
+	if broadcast {
+		resp.Data.Flags = 0
+	}
+
+	return resp
+}
+
+func getPlayersBySection(t *Tournament) map[string][]Player {
+	secPlayers := make(map[string][]Player)
+	for _, pairing := range t.CurrentPairings {
+		secPlayers[pairing.Section] = append(secPlayers[pairing.Section],
+			pairing.WhitePlayer)
+		if !pairing.IsByePairing {
+			secPlayers[pairing.Section] = append(secPlayers[pairing.Section],
+				pairing.BlackPlayer)
+		}
+	}
+
+	return secPlayers
+}
+
 // buildPairingsOutput formats pairings into grouped, aligned string output
-func buildPairingsOutput(isPredicted bool, pairings []Pairing) string {
+func buildPairingsOutput(t *Tournament) string {
 	// Group pairings by section
 	sections := make(map[string][]Pairing)
-	for _, p := range pairings {
+	for _, p := range t.CurrentPairings {
 		sections[p.Section] = append(sections[p.Section], p)
 	}
 	// Sort section names using custom criteria
@@ -294,13 +427,14 @@ func buildPairingsOutput(isPredicted bool, pairings []Pairing) string {
 
 	sb.WriteString("* Please note that pairings are tentative and subject to change before the start of the round.\n\n")
 
-	if len(pairings) > 0 {
-		if isPredicted {
+	if len(t.CurrentPairings) > 0 {
+		if t.IsPredicted() {
 			sb.WriteString(fmt.Sprintf("Round %v pairings are not yet posted, but here are my predicted round %v pairings:\n\n",
-				pairings[0].RoundNumber, pairings[0].RoundNumber))
+				t.CurrentPairings[0].RoundNumber,
+				t.CurrentPairings[0].RoundNumber))
 		} else {
 			sb.WriteString(fmt.Sprintf("Posted Round %v Pairings:\n\n",
-				pairings[0].RoundNumber))
+				t.CurrentPairings[0].RoundNumber))
 		}
 	} else {
 		sb.WriteString("No pairings posted nor predicted")
@@ -380,11 +514,17 @@ func (s sectionSorter) Swap(i, j int) { s[i], s[j] = s[j], s[i] }
 
 func (s sectionSorter) Less(i, j int) bool {
 	a, b := s[i], s[j]
-	// "Open" always first
+	// "Open" or "Championship" always first
 	if a == "Open" && b != "Open" {
 		return true
 	}
 	if b == "Open" && a != "Open" {
+		return false
+	}
+	if a == "Championship" && b != "Championship" {
+		return true
+	}
+	if b == "Championship" && a != "Championship" {
 		return false
 	}
 	ua, ub := strings.HasPrefix(a, "U"), strings.HasPrefix(b, "U")
@@ -396,7 +536,7 @@ func (s sectionSorter) Less(i, j int) bool {
 			return ai > bi
 		}
 	}
-	// U-sections before non-U (after Open)
+	// U-sections before non-U (after Championship)
 	if ua != ub {
 		return ua
 	}

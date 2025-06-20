@@ -185,19 +185,19 @@ func getBccEventDetail(eventId int64) (EventDetail, error) {
 
 // getBccTournament fetches the tournament data (players and pairings) for a
 // given eventId.
-func getBccTournament(eventId int64) (Tournament, error) {
+func getBccTournament(eventId int64) (*Tournament, error) {
 	url := fmt.Sprintf("https://beta.boylstonchess.org/api/event/%d/tournament",
 		eventId)
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
-		return Tournament{}, fmt.Errorf("unable to fetch bcc tournament (new): %w",
+		return &Tournament{}, fmt.Errorf("unable to fetch bcc tournament (new): %w",
 			err)
 	}
 	req.Header.Set("User-Agent", UserAgent)
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return Tournament{}, fmt.Errorf("unable to fetch bcc tournament (do): %w",
+		return &Tournament{}, fmt.Errorf("unable to fetch bcc tournament (do): %w",
 			err)
 	}
 	defer resp.Body.Close()
@@ -211,20 +211,20 @@ func getBccTournament(eventId int64) (Tournament, error) {
 				resp.StatusCode)
 		}
 
-		return Tournament{}, err
+		return &Tournament{}, err
 	}
 
-	var tourney Tournament
+	tourney := &Tournament{}
 	if err := json.NewDecoder(resp.Body).Decode(&tourney); err != nil {
-		return Tournament{}, fmt.Errorf("unable to parse bcc tournament: %w",
+		return &Tournament{}, fmt.Errorf("unable to parse bcc tournament: %w",
 			err)
 	}
 	return tourney, nil
 }
 
-func eventDetailToTournament(eventDetail EventDetail) (Tournament, error) {
+func eventDetailToTournament(eventDetail EventDetail) (*Tournament, error) {
 	// Build tournament players list from event details entries
-	tourney := Tournament{}
+	tourney := &Tournament{}
 	for _, entry := range eventDetail.Entries {
 		tourney.Players = append(tourney.Players, entryToPlayer(entry))
 	}

@@ -38,7 +38,7 @@ type TopLevelCommand string
 
 const (
 	TdCmd     TopLevelCommand = "td"
-	UserAgent                 = "boylstonchessclub-tdbot/0.4.2 (+https://github.com/mikeb26/boylstonchessclub-tdbot)"
+	UserAgent                 = "boylstonchessclub-tdbot/0.5.0 (+https://github.com/mikeb26/boylstonchessclub-tdbot)"
 )
 
 type CmdHandler func(i *discordgo.Interaction) *discordgo.InteractionResponse
@@ -218,6 +218,25 @@ func registerSlashCommands() {
 				Type:        discordgo.ApplicationCommandOptionSubCommand,
 				Name:        string(TdPairingsCmd),
 				Description: "Get current pairings for an event",
+				Options: []*discordgo.ApplicationCommandOption{
+					{
+						Type:        discordgo.ApplicationCommandOptionInteger,
+						Name:        "eventid",
+						Description: "Event id of the tournament (as returned by cal)",
+						Required:    true,
+					},
+					{
+						Type:        discordgo.ApplicationCommandOptionBoolean,
+						Name:        "broadcast",
+						Description: "Share with the rest of the channel instead of	only to you (default is false)",
+						Required:    false,
+					},
+				},
+			},
+			{
+				Type:        discordgo.ApplicationCommandOptionSubCommand,
+				Name:        string(TdStandingsCmd),
+				Description: "Get current standings for an event",
 				Options: []*discordgo.ApplicationCommandOption{
 					{
 						Type:        discordgo.ApplicationCommandOptionInteger,
