@@ -50,8 +50,16 @@ func buildSections(entries []Entry) map[string]section {
 		sections[entry.SectionName] = sec
 	}
 
+	// Sort sections
+	var sectionNames []string
+	for sec := range sections {
+		sectionNames = append(sectionNames, sec)
+	}
+	sort.Sort(sectionSorter(sectionNames))
+
 	boardNum := 1
-	for key, sec := range sections {
+	for _, key := range sectionNames {
+		sec := sections[key]
 		buildPairingsInSection(&sec, &boardNum)
 		sections[key] = sec
 	}

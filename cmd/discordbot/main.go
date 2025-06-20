@@ -38,7 +38,7 @@ type TopLevelCommand string
 
 const (
 	TdCmd     TopLevelCommand = "td"
-	UserAgent                 = "boylstonchessclub-tdbot/0.5.3 (+https://github.com/mikeb26/boylstonchessclub-tdbot)"
+	UserAgent                 = "boylstonchessclub-tdbot/0.5.4 (+https://github.com/mikeb26/boylstonchessclub-tdbot)"
 )
 
 type CmdHandler func(i *discordgo.Interaction) *discordgo.InteractionResponse
