@@ -23,4 +23,9 @@ Available Commands:
                          grouped by section. To share with the channel set
                          broadcast=true (false by default).
 
+  /td standings eventid=<eventId> [broadcast=<true|false>]
+                         Display current standings for a tournament,
+                         grouped by section. To share with the channel set
+                         broadcast=true (false by default).
+
 ```
