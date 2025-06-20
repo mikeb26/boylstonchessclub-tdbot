@@ -38,7 +38,7 @@ type TopLevelCommand string
 
 const (
 	TdCmd     TopLevelCommand = "td"
-	UserAgent                 = "boylstonchessclub-tdbot/0.3.1 (+https://github.com/mikeb26/boylstonchessclub-tdbot)"
+	UserAgent                 = "boylstonchessclub-tdbot/0.4.0 (+https://github.com/mikeb26/boylstonchessclub-tdbot)"
 )
 
 type CmdHandler func(i *discordgo.Interaction) *discordgo.InteractionResponse
@@ -91,6 +91,7 @@ func interactionHandler(w http.ResponseWriter, r *http.Request) {
 			resp.Data = &discordgo.InteractionResponseData{
 				Content: fmt.Sprintf("unknown command '%v'",
 					inter.ApplicationCommandData().Name),
+				Flags: discordgo.MessageFlagsEphemeral,
 			}
 		} else {
 			resp = hdlr(&inter)
@@ -181,9 +182,15 @@ func registerSlashCommands() {
 				Description: "Show upcoming events on the calendar",
 				Options: []*discordgo.ApplicationCommandOption{
 					{
-						Type:        discordgo.ApplicationCommandOptionString,
+						Type:        discordgo.ApplicationCommandOptionInteger,
 						Name:        "days",
 						Description: "Number of days to retrieve (default is 14)",
+						Required:    false,
+					},
+					{
+						Type:        discordgo.ApplicationCommandOptionBoolean,
+						Name:        "broadcast",
+						Description: "Share with the rest of the channel instead of	only to you (default is false)",
 						Required:    false,
 					},
 				},
@@ -194,10 +201,16 @@ func registerSlashCommands() {
 				Description: "Get information regarding an event",
 				Options: []*discordgo.ApplicationCommandOption{
 					{
-						Type:        discordgo.ApplicationCommandOptionString,
+						Type:        discordgo.ApplicationCommandOptionInteger,
 						Name:        "eventid",
 						Description: "Event id of the tournament (as returned by cal)",
 						Required:    true,
+					},
+					{
+						Type:        discordgo.ApplicationCommandOptionBoolean,
+						Name:        "broadcast",
+						Description: "Share with the rest of the channel instead of	only to you (default is false)",
+						Required:    false,
 					},
 				},
 			},
@@ -207,10 +220,16 @@ func registerSlashCommands() {
 				Description: "Get current pairings for an event",
 				Options: []*discordgo.ApplicationCommandOption{
 					{
-						Type:        discordgo.ApplicationCommandOptionString,
+						Type:        discordgo.ApplicationCommandOptionInteger,
 						Name:        "eventid",
 						Description: "Event id of the tournament (as returned by cal)",
 						Required:    true,
+					},
+					{
+						Type:        discordgo.ApplicationCommandOptionBoolean,
+						Name:        "broadcast",
+						Description: "Share with the rest of the channel instead of	only to you (default is false)",
+						Required:    false,
 					},
 				},
 			},

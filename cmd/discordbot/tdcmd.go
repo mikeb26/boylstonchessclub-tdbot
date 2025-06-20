@@ -53,7 +53,9 @@ var aboutText string
 func tdAboutCmdHandler(inter *discordgo.Interaction) *discordgo.InteractionResponse {
 	resp := &discordgo.InteractionResponse{
 		Type: discordgo.InteractionResponseChannelMessageWithSource,
-		Data: &discordgo.InteractionResponseData{},
+		Data: &discordgo.InteractionResponseData{
+			Flags: discordgo.MessageFlagsEphemeral,
+		},
 	}
 
 	resp.Data.Content = aboutText
@@ -67,7 +69,9 @@ var helpText string
 func tdHelpCmdHandler(inter *discordgo.Interaction) *discordgo.InteractionResponse {
 	resp := &discordgo.InteractionResponse{
 		Type: discordgo.InteractionResponseChannelMessageWithSource,
-		Data: &discordgo.InteractionResponseData{},
+		Data: &discordgo.InteractionResponseData{
+			Flags: discordgo.MessageFlagsEphemeral,
+		},
 	}
 
 	resp.Data.Content = helpText
@@ -77,21 +81,32 @@ func tdHelpCmdHandler(inter *discordgo.Interaction) *discordgo.InteractionRespon
 func tdCalCmdHandler(inter *discordgo.Interaction) *discordgo.InteractionResponse {
 	resp := &discordgo.InteractionResponse{
 		Type: discordgo.InteractionResponseChannelMessageWithSource,
-		Data: &discordgo.InteractionResponseData{},
+		Data: &discordgo.InteractionResponseData{
+			Flags: discordgo.MessageFlagsEphemeral,
+		},
 	}
 
 	data := inter.ApplicationCommandData()
-	days := 14 // default
-	if len(data.Options) != 0 && len(data.Options[0].Options) != 0 {
-		daysStr := data.Options[0].Options[0].StringValue()
-		d, err := strconv.Atoi(daysStr)
-		if err == nil && d > 0 {
-			days = d
+	days := int64(14)  // default
+	broadcast := false // default
+	if len(data.Options) > 0 {
+		for _, opt := range data.Options[0].Options {
+			if opt.Name == "days" {
+				days = opt.IntValue()
+			} else if opt.Name == "broadcast" {
+				broadcast = opt.BoolValue()
+			}
 		}
+	}
+	// enforce bounds
+	if days <= 0 {
+		days = 14
+	} else if days > 60 {
+		days = 60
 	}
 
 	now := time.Now()
-	end := now.AddDate(0, 0, days)
+	end := now.AddDate(0, 0, int(days))
 
 	// Fetch events from BCC API
 	events, err := getBccEvents()
@@ -129,33 +144,48 @@ func tdCalCmdHandler(inter *discordgo.Interaction) *discordgo.InteractionRespons
 		}
 	}
 	sb.WriteString("\nRun /td event <EventID> to get details on a specific event\n")
-
 	resp.Data.Content = sb.String()
+
+	if broadcast {
+		resp.Data.Flags = 0
+	}
+
 	return resp
 }
 
 func tdEventCmdHandler(inter *discordgo.Interaction) *discordgo.InteractionResponse {
 	resp := &discordgo.InteractionResponse{
 		Type: discordgo.InteractionResponseChannelMessageWithSource,
-		Data: &discordgo.InteractionResponseData{},
+		Data: &discordgo.InteractionResponseData{
+			Flags: discordgo.MessageFlagsEphemeral,
+		},
 	}
 
 	data := inter.ApplicationCommandData()
-	if len(data.Options) == 0 || len(data.Options[0].Options) == 0 {
+	broadcast := false // default
+	var eventID int64
+	if len(data.Options) > 0 {
+		found := false
+		for _, opt := range data.Options[0].Options {
+			if opt.Name == "eventid" {
+				eventID = opt.IntValue()
+				found = true
+			} else if opt.Name == "broadcast" {
+				broadcast = opt.BoolValue()
+			}
+		}
+		if !found {
+			resp.Data.Content = "Please provide an event ID."
+			return resp
+		}
+	} else {
 		resp.Data.Content = "Please provide an event ID."
 		return resp
 	}
 
-	eventIDStr := data.Options[0].Options[0].StringValue()
-	id, err := strconv.Atoi(eventIDStr)
+	detail, err := getBccEventDetail(eventID)
 	if err != nil {
-		resp.Data.Content = "Please provide a valid event ID."
-		return resp
-	}
-
-	detail, err := getBccEventDetail(id)
-	if err != nil {
-		resp.Data.Content = fmt.Sprintf("Error fetching event %d: %v", id, err)
+		resp.Data.Content = fmt.Sprintf("Error fetching event %d: %v", eventID, err)
 		return resp
 	}
 
@@ -189,6 +219,9 @@ func tdEventCmdHandler(inter *discordgo.Interaction) *discordgo.InteractionRespo
 		Description: sb.String(),
 	}
 	resp.Data.Embeds = []*discordgo.MessageEmbed{embed}
+	if broadcast {
+		resp.Data.Flags = 0
+	}
 
 	return resp
 }
@@ -197,30 +230,49 @@ func tdEventCmdHandler(inter *discordgo.Interaction) *discordgo.InteractionRespo
 func tdPairingsCmdHandler(inter *discordgo.Interaction) *discordgo.InteractionResponse {
 	resp := &discordgo.InteractionResponse{
 		Type: discordgo.InteractionResponseChannelMessageWithSource,
-		Data: &discordgo.InteractionResponseData{},
+		Data: &discordgo.InteractionResponseData{
+			Flags: discordgo.MessageFlagsEphemeral,
+		},
 	}
 	data := inter.ApplicationCommandData()
-	if len(data.Options) == 0 || len(data.Options[0].Options) == 0 {
+	broadcast := false // default
+	var eventID int64
+	if len(data.Options) > 0 {
+		found := false
+		for _, opt := range data.Options[0].Options {
+			if opt.Name == "eventid" {
+				eventID = opt.IntValue()
+				found = true
+			} else if opt.Name == "broadcast" {
+				broadcast = opt.BoolValue()
+			}
+		}
+		if !found {
+			resp.Data.Content = "Please provide an event ID."
+			return resp
+		}
+	} else {
 		resp.Data.Content = "Please provide an event ID."
 		return resp
 	}
-	eventIDStr := data.Options[0].Options[0].StringValue()
-	id, err := strconv.Atoi(eventIDStr)
+	tourney, err := getBccTournament(eventID)
 	if err != nil {
-		resp.Data.Content = "Please provide a valid event ID."
-		return resp
-	}
-	tourney, err := getBccTournament(id)
-	if err != nil {
-		resp.Data.Content = fmt.Sprintf("Error fetching pairings for event %d: %v", id, err)
+		resp.Data.Content = fmt.Sprintf("Error fetching pairings for event %d: %v",
+			eventID, err)
 		return resp
 	}
 	if len(tourney.CurrentPairings) == 0 {
-		resp.Data.Content = fmt.Sprintf("No pairings found for event %d.", id)
+		resp.Data.Content = fmt.Sprintf("No pairings found for event %d.",
+			eventID)
 		return resp
 	}
 	resp.Data.Content = buildPairingsOutput(tourney.IsPredicted(),
 		tourney.CurrentPairings)
+
+	if broadcast {
+		resp.Data.Flags = 0
+	}
+
 	return resp
 }
 

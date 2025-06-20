@@ -154,7 +154,7 @@ func getBccEvents() ([]Event, error) {
 
 // getBccEventDetail fetches detailed event info from the Boylston Chess API
 // for a given eventId and returns an EventDetail.
-func getBccEventDetail(eventId int) (EventDetail, error) {
+func getBccEventDetail(eventId int64) (EventDetail, error) {
 	url := fmt.Sprintf("https://beta.boylstonchess.org/api/event/%d", eventId)
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
@@ -182,7 +182,7 @@ func getBccEventDetail(eventId int) (EventDetail, error) {
 
 // getBccTournament fetches the tournament data (players and pairings) for a
 // given eventId.
-func getBccTournament(eventId int) (Tournament, error) {
+func getBccTournament(eventId int64) (Tournament, error) {
 	url := fmt.Sprintf("https://beta.boylstonchess.org/api/event/%d/tournament",
 		eventId)
 	req, err := http.NewRequest("GET", url, nil)

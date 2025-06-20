@@ -48,9 +48,9 @@ func TestTdEventCmdHandler(t *testing.T) {
 					Type: discordgo.ApplicationCommandOptionSubCommand,
 					Options: []*discordgo.ApplicationCommandInteractionDataOption{
 						{
-							Name:  "eventID",
-							Type:  discordgo.ApplicationCommandOptionString,
-							Value: "1312",
+							Name:  "eventid",
+							Type:  discordgo.ApplicationCommandOptionInteger,
+							Value: 1312.0,
 						},
 					},
 				},
