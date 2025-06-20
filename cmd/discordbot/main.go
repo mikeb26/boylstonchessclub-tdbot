@@ -10,10 +10,10 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"io"
 	"log"
 	"net/http"
 	"os"
+	"strings"
 
 	"github.com/bwmarrin/discordgo"
 
@@ -38,7 +38,7 @@ type TopLevelCommand string
 
 const (
 	TdCmd     TopLevelCommand = "td"
-	UserAgent                 = "boylstonchessclub-tdbot/0.5.4 (+https://github.com/mikeb26/boylstonchessclub-tdbot)"
+	UserAgent                 = "boylstonchessclub-tdbot/0.5.5 (+https://github.com/mikeb26/boylstonchessclub-tdbot)"
 )
 
 type CmdHandler func(i *discordgo.Interaction) *discordgo.InteractionResponse
@@ -59,25 +59,17 @@ func interactionHandler(w http.ResponseWriter, r *http.Request) {
 	// log.Printf("discordbot.int: processing new request HEADERS:")
 	// logHeaders(r)
 
-	if !discordgo.VerifyInteraction(r, botPubKey) {
-		log.Printf("discordbot.int: failed to verify")
-		w.WriteHeader(http.StatusUnauthorized)
-		return
-	}
-
-	body, err := io.ReadAll(r.Body)
-	if err != nil {
-		log.Printf("discordbot.int: failed to read request body: %v", err)
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-
 	var inter discordgo.Interaction
-	if err := inter.UnmarshalJSON(body); err != nil {
-		log.Printf("discordbot.int: failed to unmarshal interaction: err:%v body:%v",
-			err, body)
-		w.WriteHeader(http.StatusBadRequest)
-		return
+	err := discordgo.VerifyUnmarshalInteraction(r, botPubKey, &inter)
+	if err != nil {
+		log.Printf("discordbot.int: %v", err)
+		if strings.Contains(err.Error(), "unmarshal") {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		} else {
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
 	}
 
 	resp := &discordgo.InteractionResponse{}

@@ -1,13 +1,12 @@
 module github.com/mikeb26/boylstonchessclub-tdbot
 
-go 1.23.0
+go 1.22.3
 
-toolchain go1.23.10
+replace github.com/bwmarrin/discordgo => github.com/mikeb26/bwmarrin-discordgo v0.0.0-20250620200528-0a956e8180f7
 
 require (
 	github.com/araddon/dateparse v0.0.0-20210429162001-6b43995a97de
-	github.com/bwmarrin/discordgo v0.29.0
-	golang.org/x/sync v0.15.0
+	github.com/bwmarrin/discordgo v0.0.0-00010101000000-000000000000
 )
 
 require (
