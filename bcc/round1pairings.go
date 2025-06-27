@@ -2,7 +2,7 @@
  *
  * See LICENSE file at the root of this repository for license terms
  */
-package main
+package bcc
 
 import (
 	"regexp"
@@ -55,7 +55,7 @@ func buildSections(entries []Entry) map[string]section {
 	for sec := range sections {
 		sectionNames = append(sectionNames, sec)
 	}
-	sort.Sort(sectionSorter(sectionNames))
+	sort.Sort(SectionSorter(sectionNames))
 
 	boardNum := 1
 	for _, key := range sectionNames {

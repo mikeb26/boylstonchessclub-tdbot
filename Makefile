@@ -13,6 +13,7 @@ discordbot: vendor FORCE
 
 test: build FORCE
 	go test github.com/mikeb26/boylstonchessclub-tdbot/cmd/discordbot
+	go test github.com/mikeb26/boylstonchessclub-tdbot/bcc
 
 .PHONY: deps
 deps:
