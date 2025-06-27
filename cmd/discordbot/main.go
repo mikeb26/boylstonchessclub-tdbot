@@ -37,8 +37,7 @@ var client *discordgo.Session
 type TopLevelCommand string
 
 const (
-	TdCmd     TopLevelCommand = "td"
-	UserAgent                 = "boylstonchessclub-tdbot/0.5.5 (+https://github.com/mikeb26/boylstonchessclub-tdbot)"
+	TdCmd TopLevelCommand = "td"
 )
 
 type CmdHandler func(i *discordgo.Interaction) *discordgo.InteractionResponse
