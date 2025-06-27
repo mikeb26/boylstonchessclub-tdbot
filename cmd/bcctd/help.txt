@@ -1,0 +1,25 @@
+Boylston Chess Club TD Help
+
+Available Commands:
+  bcctd help             This help screen
+
+  bcctd cal [--days <days>]
+                         Show upcoming events over the specified
+                         number of days (14 by default if not
+                         specified).
+
+  bcctd event --eventid <eventId>
+                         Retrieve detailed information regarding an
+                         event.
+
+  bcctd pairings --eventid <eventId>
+                         Display current pairings for a tournament,
+                         grouped by section.
+
+  bcctd standings --eventid <eventId>
+                         Display current standings for a tournament,
+                         grouped by section.
+
+  bcctd crosstable --uscftid <tid>
+                         Display tournament cross table for the
+			 given USCF tournament id.

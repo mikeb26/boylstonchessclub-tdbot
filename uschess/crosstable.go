@@ -53,7 +53,7 @@ type CrossTable struct {
 }
 
 // FetchCrossTable retrieves all sections' cross tables from the given id.
-func FetchCrossTables(id string) ([]*CrossTable, error) {
+func FetchCrossTables(id int) ([]*CrossTable, error) {
 	url := fmt.Sprintf("https://www.uschess.org/msa/XtblMain.php?%v.0", id)
 
 	req, err := http.NewRequest("GET", url, nil)
@@ -232,7 +232,7 @@ func parseCrossTableEntries(start, numCols int,
 
 		entries = append(entries, CrossTableEntry{
 			PairNum:          pairNum,
-			PlayerName:       name,
+			PlayerName:       normalizeName(name),
 			PlayerId:         playerID,
 			PlayerRatingPre:  preR,
 			PlayerRatingPost: postR,

@@ -279,7 +279,9 @@ func tdPairingsCmdHandler(inter *discordgo.Interaction) *discordgo.InteractionRe
 		log.Printf("discordbot.pairings: %v", resp.Data.Content)
 		return resp
 	}
-	resp.Data.Content = bcc.BuildPairingsOutput(tourney)
+	// Wrap output in code block for monospace formatting in Discord
+	resp.Data.Content = fmt.Sprintf("```\n%s```",
+		bcc.BuildPairingsOutput(tourney))
 
 	if broadcast {
 		resp.Data.Flags = 0
@@ -328,7 +330,9 @@ func tdStandingsCmdHandler(inter *discordgo.Interaction) *discordgo.InteractionR
 		return resp
 	}
 
-	resp.Data.Content = bcc.BuildStandingsOutput(tourney)
+	// Wrap output in code block for monospace formatting in Discord
+	resp.Data.Content =
+		fmt.Sprintf("```\n%s```", bcc.BuildStandingsOutput(tourney))
 
 	if broadcast {
 		resp.Data.Flags = 0

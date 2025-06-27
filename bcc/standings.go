@@ -25,6 +25,9 @@ func BuildStandingsOutput(t *Tournament) string {
 	sort.Sort(SectionSorter(sectionNames))
 	var sb strings.Builder
 
+	sb.WriteString(fmt.Sprintf("Standings prior to Round %v:\n\n",
+		t.CurrentPairings[0].RoundNumber))
+
 	for sec, players := range secPlayers {
 		sort.Slice(players, func(i, j int) bool {
 			return players[i].PlaceNumber < players[j].PlaceNumber
@@ -78,8 +81,8 @@ func BuildStandingsOutput(t *Tournament) string {
 		}
 		sb.WriteString("\n")
 	}
-	// Wrap output in code block for monospace formatting in Discord
-	return fmt.Sprintf("```\n%s```", sb.String())
+
+	return sb.String()
 }
 
 func getPlayersBySection(t *Tournament) map[string][]Player {

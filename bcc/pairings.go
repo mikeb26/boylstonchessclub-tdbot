@@ -100,6 +100,6 @@ func BuildPairingsOutput(t *Tournament) string {
 		}
 		sb.WriteString("\n")
 	}
-	// Wrap output in code block for monospace formatting in Discord
-	return fmt.Sprintf("```\n%s```", sb.String())
+
+	return sb.String()
 }

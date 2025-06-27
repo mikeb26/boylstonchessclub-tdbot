@@ -1,4 +1,5 @@
 /.bopmatic
 /discordbot
+/bcctd
 /vendor
 /cmd/discordbot/token.priv

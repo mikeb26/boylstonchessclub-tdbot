@@ -10,7 +10,7 @@ import (
 )
 
 func TestFetchCrossTables202506242722(t *testing.T) {
-	cts, err := FetchCrossTables("202506242722")
+	cts, err := FetchCrossTables(202506242722)
 	if err != nil {
 		t.Fatalf("FetchCrossTables error: %v", err)
 	}
@@ -29,10 +29,10 @@ func TestFetchCrossTables202506242722(t *testing.T) {
 	if openCT == nil {
 		t.Fatalf("OPEN section not found among sections: %+v", cts)
 	}
-	// Locate RUFUS BEHR entry
+	// Locate Rufus' entry
 	var entry *CrossTableEntry
 	for i := range openCT.PlayerEntries {
-		if openCT.PlayerEntries[i].PlayerName == "RUFUS BEHR" {
+		if openCT.PlayerEntries[i].PlayerName == "Rufus Behr" {
 			entry = &openCT.PlayerEntries[i]
 			break
 		}

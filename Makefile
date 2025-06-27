@@ -2,7 +2,7 @@ export GO111MODULE=on
 export GOFLAGS=-mod=vendor
 
 .PHONY: build
-build: discordbot
+build: discordbot bcctd
 
 vendor: go.mod
 	go mod download
@@ -10,6 +10,9 @@ vendor: go.mod
 
 discordbot: vendor FORCE
 	go build github.com/mikeb26/boylstonchessclub-tdbot/cmd/discordbot
+
+bcctd: vendor FORCE
+	go build github.com/mikeb26/boylstonchessclub-tdbot/cmd/bcctd
 
 test: build FORCE
 	go test github.com/mikeb26/boylstonchessclub-tdbot/cmd/discordbot
@@ -26,6 +29,6 @@ deps:
 
 .PHONY: clean
 clean:
-	rm -rf discordbot
+	rm -rf discordbot bcctd
 
 FORCE:

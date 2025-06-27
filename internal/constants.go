@@ -5,5 +5,5 @@
 package internal
 
 const (
-	UserAgent = "boylstonchessclub-tdbot/0.5.5 (+https://github.com/mikeb26/boylstonchessclub-tdbot)"
+	UserAgent = "boylstonchessclub-tdbot/0.6.0 (+https://github.com/mikeb26/boylstonchessclub-tdbot)"
 )
