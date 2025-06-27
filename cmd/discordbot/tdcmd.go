@@ -7,6 +7,7 @@ package main
 import (
 	_ "embed"
 	"fmt"
+	"log"
 	"sort"
 	"strconv"
 	"strings"
@@ -114,6 +115,7 @@ func tdCalCmdHandler(inter *discordgo.Interaction) *discordgo.InteractionRespons
 	events, err := getBccEvents()
 	if err != nil {
 		resp.Data.Content = fmt.Sprintf("Error fetching events: %v", err)
+		log.Printf("discordbot.cal: %v", resp.Data.Content)
 		return resp
 	}
 
@@ -129,6 +131,7 @@ func tdCalCmdHandler(inter *discordgo.Interaction) *discordgo.InteractionRespons
 
 	if len(eventsByDate) == 0 {
 		resp.Data.Content = fmt.Sprintf("No events found in the next %d days.", days)
+		log.Printf("discordbot.cal: %v", resp.Data.Content)
 		return resp
 	}
 
@@ -178,16 +181,19 @@ func tdEventCmdHandler(inter *discordgo.Interaction) *discordgo.InteractionRespo
 		}
 		if !found {
 			resp.Data.Content = "Please provide an event ID."
+			log.Printf("discordbot.event: %v", resp.Data.Content)
 			return resp
 		}
 	} else {
 		resp.Data.Content = "Please provide an event ID."
+		log.Printf("discordbot.event: %v", resp.Data.Content)
 		return resp
 	}
 
 	detail, err := getBccEventDetail(eventID)
 	if err != nil {
 		resp.Data.Content = fmt.Sprintf("Error fetching event %d: %v", eventID, err)
+		log.Printf("discordbot.event: %v", resp.Data.Content)
 		return resp
 	}
 
@@ -251,21 +257,25 @@ func tdPairingsCmdHandler(inter *discordgo.Interaction) *discordgo.InteractionRe
 		}
 		if !found {
 			resp.Data.Content = "Please provide an event ID."
+			log.Printf("discordbot.pairings: %v", resp.Data.Content)
 			return resp
 		}
 	} else {
 		resp.Data.Content = "Please provide an event ID."
+		log.Printf("discordbot.pairings: %v", resp.Data.Content)
 		return resp
 	}
 	tourney, err := getBccTournament(eventID)
 	if err != nil {
 		resp.Data.Content = fmt.Sprintf("Error fetching pairings for event %d: %v",
 			eventID, err)
+		log.Printf("discordbot.pairings: %v", resp.Data.Content)
 		return resp
 	}
 	if len(tourney.CurrentPairings) == 0 {
 		resp.Data.Content = fmt.Sprintf("No pairings found for event %d.",
 			eventID)
+		log.Printf("discordbot.pairings: %v", resp.Data.Content)
 		return resp
 	}
 	resp.Data.Content = buildPairingsOutput(tourney)
@@ -373,16 +383,19 @@ func tdStandingsCmdHandler(inter *discordgo.Interaction) *discordgo.InteractionR
 		}
 		if !found {
 			resp.Data.Content = "Please provide an event ID."
+			log.Printf("discordbot.standings: %v", resp.Data.Content)
 			return resp
 		}
 	} else {
 		resp.Data.Content = "Please provide an event ID."
+		log.Printf("discordbot.standings: %v", resp.Data.Content)
 		return resp
 	}
 	tourney, err := getBccTournament(eventID)
 	if err != nil {
 		resp.Data.Content = fmt.Sprintf("Error fetching standings for event %d: %v",
 			eventID, err)
+		log.Printf("discordbot.standings: %v", resp.Data.Content)
 		return resp
 	}
 
