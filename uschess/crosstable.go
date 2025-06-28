@@ -43,8 +43,8 @@ type CrossTableEntry struct {
 	PairNum          int
 	PlayerName       string
 	PlayerId         int
-	PlayerRatingPre  int
-	PlayerRatingPost int
+	PlayerRatingPre  string
+	PlayerRatingPost string
 	TotalPoints      float64
 	Results          []RoundResult
 }
@@ -163,7 +163,8 @@ func parseCrossTableEntries(start, numCols int,
 	// Prepare regexes
 	digitsRe := regexp.MustCompile(`\d+`)
 	dataLineRe := regexp.MustCompile(`^\s*\d+\s*\|`)
-	idRe := regexp.MustCompile(`^(\d+)\s*/\s*R:\s*(\d+)\s*->\s*(\d+)$`)
+	// Match playerID and pre->post ratings, capturing raw rating strings
+	idRe := regexp.MustCompile(`^(\d+)\s*/\s*R:\s*(.*?)\s*->\s*(.*?)$`)
 
 	var entries []CrossTableEntry
 	for j := start; j+1 < len(lines); j++ {
@@ -177,6 +178,7 @@ func parseCrossTableEntries(start, numCols int,
 		}
 		l2 := lines[j+1]
 
+		// Split fields by column boundaries
 		c1 := make([]string, numCols)
 		c2 := make([]string, numCols)
 		for k := 0; k < numCols; k++ {
@@ -195,17 +197,21 @@ func parseCrossTableEntries(start, numCols int,
 			c2[k] = strings.TrimSpace(l2[sp:ep])
 		}
 
+		// Extract player ID and ratings
 		m := idRe.FindStringSubmatch(c2[1])
 		if len(m) != 4 {
 			continue
 		}
+		// Player ID
+		playerID, _ := strconv.Atoi(m[1])
+		// Keep full rating strings including any provisional suffixes
+		preRating := strings.TrimSpace(m[2])
+		postRating := strings.TrimSpace(m[3])
+		totalPts, _ := strconv.ParseFloat(c1[2], 64)
 		pairNum, _ := strconv.Atoi(c1[0])
 		name := c1[1]
-		playerID, _ := strconv.Atoi(m[1])
-		preR, _ := strconv.Atoi(m[2])
-		postR, _ := strconv.Atoi(m[3])
-		totalPts, _ := strconv.ParseFloat(c1[2], 64)
 
+		// Parse round results
 		var results []RoundResult
 		for r := 0; r < numRounds; r++ {
 			cellRes := strings.TrimSpace(c1[3+r])
@@ -237,7 +243,7 @@ func parseCrossTableEntries(start, numCols int,
 			default:
 				outcome = ResultUnknown
 			}
-			var col string
+			col := ""
 			if strings.ToUpper(cellCol) == "W" {
 				col = "white"
 			} else if strings.ToUpper(cellCol) == "B" {
@@ -251,8 +257,8 @@ func parseCrossTableEntries(start, numCols int,
 			PairNum:          pairNum,
 			PlayerName:       normalizeName(name),
 			PlayerId:         playerID,
-			PlayerRatingPre:  preR,
-			PlayerRatingPost: postR,
+			PlayerRatingPre:  preRating,
+			PlayerRatingPost: postRating,
 			TotalPoints:      totalPts,
 			Results:          results,
 		})

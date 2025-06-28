@@ -44,11 +44,11 @@ func TestFetchCrossTables202506242722(t *testing.T) {
 	if entry.PlayerId != 16438266 {
 		t.Errorf("expected PlayerId 16438266, got %d", entry.PlayerId)
 	}
-	if entry.PlayerRatingPre != 1735 {
-		t.Errorf("expected PlayerRatingPre 1735, got %d", entry.PlayerRatingPre)
+	if entry.PlayerRatingPre != "1735" {
+		t.Errorf("expected PlayerRatingPre 1735, got %v", entry.PlayerRatingPre)
 	}
-	if entry.PlayerRatingPost != 1751 {
-		t.Errorf("expected PlayerRatingPost 1751, got %d", entry.PlayerRatingPost)
+	if entry.PlayerRatingPost != "1751" {
+		t.Errorf("expected PlayerRatingPost 1751, got %v", entry.PlayerRatingPost)
 	}
 	if entry.TotalPoints != 2.0 {
 		t.Errorf("expected TotalPoints 2.0, got %f", entry.TotalPoints)
@@ -59,8 +59,8 @@ func TestFetchCrossTables202506242722(t *testing.T) {
 	} else {
 		// Round 1: bye
 		r := entry.Results[0]
-		if r.Outcome != ResultBye {
-			t.Errorf("round 1: expected bye, got %+v", r)
+		if r.Outcome != ResultFullBye {
+			t.Errorf("round 1: expected full bye, got %+v", r)
 		}
 		// Round 2: loss to 8 with black
 		r = entry.Results[1]

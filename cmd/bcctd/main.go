@@ -230,7 +230,7 @@ func buildOneCrossTableOutput(xt *uschess.CrossTable,
 		row := []string{
 			fmt.Sprintf("%d.", e.PairNum),
 			e.PlayerName,
-			fmt.Sprintf("%d->%d", e.PlayerRatingPre, e.PlayerRatingPost),
+			fmt.Sprintf("%v->%v", e.PlayerRatingPre, e.PlayerRatingPost),
 			fmt.Sprintf("%.1f", e.TotalPoints),
 		}
 		for _, res := range e.Results {
