@@ -23,7 +23,12 @@ const (
 	ResultWin Result = iota
 	ResultLoss
 	ResultDraw
-	ResultBye
+	ResultFullBye
+	ResultHalfBye
+	ResultLossByForfeit
+	ResultWinByForfeit
+	ResultUnplayedGame
+	ResultUnknown
 )
 
 // RoundResult holds the result of a single round for a player.
@@ -205,8 +210,8 @@ func parseCrossTableEntries(start, numCols int,
 		for r := 0; r < numRounds; r++ {
 			cellRes := strings.TrimSpace(c1[3+r])
 			cellCol := strings.TrimSpace(c2[3+r])
-			if cellRes == "" || !strings.ContainsAny(cellRes, "WLD") {
-				results = append(results, RoundResult{Outcome: ResultBye})
+			if cellRes == "" || !strings.ContainsAny(cellRes, "WLDUXFHB") {
+				results = append(results, RoundResult{Outcome: ResultUnknown})
 				continue
 			}
 			op := digitsRe.FindString(cellRes)
@@ -219,6 +224,18 @@ func parseCrossTableEntries(start, numCols int,
 				outcome = ResultLoss
 			case 'D':
 				outcome = ResultDraw
+			case 'U':
+				outcome = ResultUnplayedGame
+			case 'X':
+				outcome = ResultWinByForfeit
+			case 'F':
+				outcome = ResultLossByForfeit
+			case 'H':
+				outcome = ResultHalfBye
+			case 'B':
+				outcome = ResultFullBye
+			default:
+				outcome = ResultUnknown
 			}
 			var col string
 			if strings.ToUpper(cellCol) == "W" {

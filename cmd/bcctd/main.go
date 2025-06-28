@@ -224,6 +224,7 @@ func buildOneCrossTableOutput(xt *uschess.CrossTable,
 	}
 
 	// Build rows
+	forfeitFound := false
 	var rows [][]string
 	for _, e := range xt.PlayerEntries {
 		row := []string{
@@ -237,15 +238,27 @@ func buildOneCrossTableOutput(xt *uschess.CrossTable,
 			switch res.Outcome {
 			case uschess.ResultWin:
 				cell = fmt.Sprintf("W%d", res.OpponentPairNum)
+				cell += fmt.Sprintf("(%c)", res.Color[0])
+			case uschess.ResultWinByForfeit:
+				forfeitFound = true
+				cell = fmt.Sprintf("W*")
 			case uschess.ResultLoss:
 				cell = fmt.Sprintf("L%d", res.OpponentPairNum)
+				cell += fmt.Sprintf("(%c)", res.Color[0])
+			case uschess.ResultLossByForfeit:
+				forfeitFound = true
+				cell = fmt.Sprintf("L*")
 			case uschess.ResultDraw:
 				cell = fmt.Sprintf("D%d", res.OpponentPairNum)
-			case uschess.ResultBye:
-				cell = "BYE"
-			}
-			if res.Outcome != uschess.ResultBye {
 				cell += fmt.Sprintf("(%c)", res.Color[0])
+			case uschess.ResultFullBye:
+				cell = "BYE(1.0)"
+			case uschess.ResultHalfBye:
+				cell = "BYE(0.5)"
+			case uschess.ResultUnplayedGame:
+				cell = "BYE(0.0)"
+			default:
+				cell = "?"
 			}
 			row = append(row, cell)
 		}
@@ -277,6 +290,9 @@ func buildOneCrossTableOutput(xt *uschess.CrossTable,
 	// Write rows
 	for _, row := range rows {
 		sb.WriteString(fmt.Sprintf(fmtStr, toAnySlice(row)...))
+	}
+	if forfeitFound {
+		sb.WriteString("* indicates game was decided by forfeit\n")
 	}
 	sb.WriteString("\n")
 
