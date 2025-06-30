@@ -70,17 +70,17 @@ func (e *Event) UnmarshalJSON(data []byte) error {
 	}
 	var err error
 	// Parse Date
-	e.Date, err = parseDateOrZero(aux.Date)
+	e.Date, err = internal.ParseDateOrZero(aux.Date)
 	if err != nil {
 		return fmt.Errorf("parsing Event.Date: %w", err)
 	}
 	// Parse StartDate
-	e.StartDate, err = parseDateOrZero(aux.StartDate)
+	e.StartDate, err = internal.ParseDateOrZero(aux.StartDate)
 	if err != nil {
 		return fmt.Errorf("parsing Event.StartDate: %w", err)
 	}
 	// Parse EndDate
-	e.EndDate, err = parseDateOrZero(aux.EndDate)
+	e.EndDate, err = internal.ParseDateOrZero(aux.EndDate)
 	if err != nil {
 		return fmt.Errorf("parsing Event.EndDate: %w", err)
 	}

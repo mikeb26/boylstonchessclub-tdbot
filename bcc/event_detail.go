@@ -105,23 +105,23 @@ func (ed *EventDetail) UnmarshalJSON(data []byte) error {
 		return fmt.Errorf("EventDetail unmarshal: %w", err)
 	}
 	var err error
-	ed.StartDate, err = parseDateOrZero(aux.StartDate)
+	ed.StartDate, err = internal.ParseDateOrZero(aux.StartDate)
 	if err != nil {
 		return fmt.Errorf("parsing EventDetail.StartDate: %w", err)
 	}
-	ed.EndDate, err = parseDateOrZero(aux.EndDate)
+	ed.EndDate, err = internal.ParseDateOrZero(aux.EndDate)
 	if err != nil {
 		return fmt.Errorf("parsing EventDetail.EndDate: %w", err)
 	}
-	ed.RegistrationEndDate, err = parseDateOrZero(aux.RegistrationEndDate)
+	ed.RegistrationEndDate, err = internal.ParseDateOrZero(aux.RegistrationEndDate)
 	if err != nil {
 		return fmt.Errorf("parsing EventDetail.RegistrationEndDate: %w", err)
 	}
-	ed.CreationDate, err = parseDateOrZero(aux.CreationDate)
+	ed.CreationDate, err = internal.ParseDateOrZero(aux.CreationDate)
 	if err != nil {
 		return fmt.Errorf("parsing EventDetail.CreationDate: %w", err)
 	}
-	ed.LastChangeDate, err = parseDateOrZero(aux.LastChangeDate)
+	ed.LastChangeDate, err = internal.ParseDateOrZero(aux.LastChangeDate)
 	if err != nil {
 		return fmt.Errorf("parsing EventDetail.LastChangeDate: %w", err)
 	}
@@ -143,7 +143,7 @@ func (e *Entry) UnmarshalJSON(data []byte) error {
 		return fmt.Errorf("Entry unmarshal: %w", err)
 	}
 	var err error
-	e.RegistrationDate, err = parseDateOrZero(aux.RegistrationDate)
+	e.RegistrationDate, err = internal.ParseDateOrZero(aux.RegistrationDate)
 	if err != nil {
 		return fmt.Errorf("parsing Entry.RegistrationDate: %w", err)
 	}

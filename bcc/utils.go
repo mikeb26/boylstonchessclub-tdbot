@@ -8,9 +8,6 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
-	"time"
-
-	"github.com/araddon/dateparse"
 )
 
 // Construct an artificial Tournament from an EventDetail
@@ -55,14 +52,6 @@ func strRatingToInt(rating string) int {
 	}
 
 	return r
-}
-
-// parseDateOrZero returns a parsed time or zero if input is empty or "null".
-func parseDateOrZero(s string) (time.Time, error) {
-	if s == "" || s == "null" {
-		return time.Time{}, nil
-	}
-	return dateparse.ParseAny(s)
 }
 
 // SectionSorter implements sort.Interface for custom section ordering
