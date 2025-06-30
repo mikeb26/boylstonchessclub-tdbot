@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/mikeb26/boylstonchessclub-tdbot/bcc"
+	"github.com/mikeb26/boylstonchessclub-tdbot/internal"
 	"github.com/mikeb26/boylstonchessclub-tdbot/uschess"
 )
 
@@ -32,6 +33,7 @@ var commands = map[string]cmdHandler{
 	"pairings":   handlePairings,
 	"standings":  handleStandings,
 	"crosstable": handleCrossTable,
+	"history":    handleHistory,
 }
 
 func main() {
@@ -306,4 +308,65 @@ func toAnySlice[T any](slice []T) []any {
 		result[i] = v
 	}
 	return result
+}
+
+func handleHistory(args []string) {
+	fs := flag.NewFlagSet("history", flag.ExitOnError)
+	days := fs.Int("days", 14, "Number of days to retrieve (1-60)")
+	aid := fs.String("uscfaid", internal.BccUSCFAffiliateID, "USCF Affiliate ID")
+	if err := fs.Parse(args); err != nil {
+		os.Exit(1)
+	}
+	if *aid == "" {
+		fmt.Fprintln(os.Stderr, "Please provide a valid --uscfaid ID.")
+		fs.Usage()
+		os.Exit(1)
+	}
+
+	// enforce bounds
+	if *days <= 0 {
+		*days = 14
+	} else if *days > 60 {
+		*days = 60
+	}
+
+	now := time.Now()
+	end := now.AddDate(0, 0, -*days)
+
+	events, err := uschess.GetAffiliateEvents(*aid)
+	if err != nil {
+		log.Fatalf("Error fetching events for aid:%v: %v", *aid, err)
+	}
+
+	// Filter and group events by date
+	eventsByDate := make(map[string][]uschess.Event)
+	for _, ev := range events {
+		if ev.EndDate.Before(end) {
+			continue
+		}
+		key := ev.EndDate.Format("2006-01-02")
+
+		eventsByDate[key] = append(eventsByDate[key], ev)
+	}
+
+	if len(eventsByDate) == 0 {
+		fmt.Printf("No recent events found for aid:%v\n", *aid)
+		return
+	}
+	// Build sorted output
+	var dates []string
+	for d := range eventsByDate {
+		dates = append(dates, d)
+	}
+	sort.Slice(dates, func(i, j int) bool {
+		return dates[i] > dates[j]
+	})
+	for _, d := range dates {
+		fmt.Println(d)
+		for _, ev := range eventsByDate[d] {
+			fmt.Printf("  - %s (uscftid:%v)\n", ev.Name, ev.ID)
+		}
+	}
+	fmt.Printf("\nRun '%s crosstable --uscftid ID' to get results from a specific event\n",
+		os.Args[0])
 }

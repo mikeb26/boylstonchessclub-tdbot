@@ -23,3 +23,9 @@ Available Commands:
   bcctd crosstable --uscftid <tid>
                          Display tournament cross table for the
 			 given USCF tournament id.
+
+  bcctd history [--days <days>] [--uscfaid <aid>]
+                         Display recent completed tournaments from a
+                         given USCF affiliate (default is Boylston
+                         Chess Club) over the specified last number
+			 of days (14 by default if not specified).
