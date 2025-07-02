@@ -5,18 +5,13 @@
 package main
 
 import (
-	"context"
 	_ "embed"
 	"flag"
 	"fmt"
 	"log"
 	"os"
 	"sort"
-	"strings"
-	"sync"
 	"time"
-
-	"golang.org/x/sync/errgroup"
 
 	"github.com/mikeb26/boylstonchessclub-tdbot/bcc"
 	"github.com/mikeb26/boylstonchessclub-tdbot/internal"
@@ -223,143 +218,9 @@ func handleCrossTable(args []string) {
 	}
 
 	for _, xt := range xTables {
-		output := buildOneCrossTableOutput(xt, len(xTables) > 1, 0)
+		output := uschess.BuildOneCrossTableOutput(xt, len(xTables) > 1, 0)
 		fmt.Printf(output)
 	}
-}
-
-func buildOneCrossTableOutput(xt *uschess.CrossTable,
-	includeSectionHeader bool, filterPlayerID int) string {
-
-	// If filtering, determine which pair numbers to include (player + opponents)
-	var includeSet map[int]bool
-	var filteredPlayerPairNum int
-	if filterPlayerID != 0 {
-		includeSet = make(map[int]bool)
-		// find player entry
-		for _, e := range xt.PlayerEntries {
-			if e.PlayerId == filterPlayerID {
-				filteredPlayerPairNum = e.PairNum
-				includeSet[e.PairNum] = true
-				// record opponents
-				for _, res := range e.Results {
-					if res.OpponentPairNum > 0 {
-						includeSet[res.OpponentPairNum] = true
-					}
-				}
-				break
-			}
-		}
-	}
-
-	var sb strings.Builder
-
-	if includeSectionHeader {
-		sb.WriteString(fmt.Sprintf("%v\n", xt.SectionName))
-	}
-
-	// Build headers
-	numRounds := xt.NumRounds
-	headers := []string{"No", "Name", "Rating", "Pts"}
-	for i := 1; i <= numRounds; i++ {
-		headers = append(headers, fmt.Sprintf("R%d", i))
-	}
-
-	// Build rows
-	forfeitFound := false
-	var rows [][]string
-	for _, e := range xt.PlayerEntries {
-		playerName := e.PlayerName
-
-		// apply filter
-		if includeSet != nil {
-			if !includeSet[e.PairNum] {
-				continue
-			}
-			if filteredPlayerPairNum == e.PairNum {
-				playerName = fmt.Sprintf("++%v++", playerName)
-			}
-		}
-
-		row := []string{
-			fmt.Sprintf("%d.", e.PairNum),
-			playerName,
-			fmt.Sprintf("%v->%v", e.PlayerRatingPre, e.PlayerRatingPost),
-			fmt.Sprintf("%.1f", e.TotalPoints),
-		}
-		for _, res := range e.Results {
-			var cell string
-			switch res.Outcome {
-			case uschess.ResultWin:
-				cell = fmt.Sprintf("W%d", res.OpponentPairNum)
-				cell += fmt.Sprintf("(%c)", res.Color[0])
-			case uschess.ResultWinByForfeit:
-				forfeitFound = true
-				cell = fmt.Sprintf("W*")
-			case uschess.ResultLoss:
-				cell = fmt.Sprintf("L%d", res.OpponentPairNum)
-				cell += fmt.Sprintf("(%c)", res.Color[0])
-			case uschess.ResultLossByForfeit:
-				forfeitFound = true
-				cell = fmt.Sprintf("L*")
-			case uschess.ResultDraw:
-				cell = fmt.Sprintf("D%d", res.OpponentPairNum)
-				cell += fmt.Sprintf("(%c)", res.Color[0])
-			case uschess.ResultFullBye:
-				cell = "BYE(1.0)"
-			case uschess.ResultHalfBye:
-				cell = "BYE(0.5)"
-			case uschess.ResultUnplayedGame:
-				cell = "BYE(0.0)"
-			default:
-				cell = "?"
-			}
-			row = append(row, cell)
-		}
-		rows = append(rows, row)
-	}
-
-	// Compute column widths
-	colWidths := make([]int, len(headers))
-	for i, h := range headers {
-		colWidths[i] = len(h)
-	}
-	for _, row := range rows {
-		for i, cell := range row {
-			if len(cell) > colWidths[i] {
-				colWidths[i] = len(cell)
-			}
-		}
-	}
-
-	// Build format string
-	var fmtStrBuilder strings.Builder
-	for _, w := range colWidths {
-		fmtStrBuilder.WriteString(fmt.Sprintf("%%-%ds  ", w))
-	}
-	fmtStr := strings.TrimRight(fmtStrBuilder.String(), " ") + "\n"
-
-	// Write header
-	sb.WriteString(fmt.Sprintf(fmtStr, toAnySlice(headers)...))
-	// Write rows
-	for _, row := range rows {
-		sb.WriteString(fmt.Sprintf(fmtStr, toAnySlice(row)...))
-	}
-	if forfeitFound {
-		sb.WriteString("* indicates game was decided by forfeit\n")
-	}
-	sb.WriteString("\n")
-
-	return sb.String()
-}
-
-// toAnySlice converts a slice of any type to a slice of any (interface{}).
-func toAnySlice[T any](slice []T) []any {
-	result := make([]any, len(slice))
-	for i, v := range slice {
-		result[i] = v
-	}
-	return result
 }
 
 func handleHistory(args []string) {
@@ -444,112 +305,10 @@ func handlePlayer(args []string) {
 		*eventCount = 5
 	}
 
-	player, err := uschess.FetchPlayer(*memberID)
+	report, err := uschess.GetPlayerReport(*memberID, *eventCount)
 	if err != nil {
 		log.Fatalf("Error fetching player %v: %v", memberID, err)
 	}
 
-	xTables, err := fetchRecentPlayerCrossTables(player, *eventCount)
-	if err != nil {
-		log.Fatalf("Error fetching player %v events: %v", memberID, err)
-	}
-	output := buildPlayerOutput(player, xTables)
-
-	fmt.Printf("%v", output)
-}
-
-func buildPlayerOutput(player *uschess.Player,
-	xTables map[int][]uschess.CrossTable) string {
-
-	var sb strings.Builder
-
-	sb.WriteString(fmt.Sprintf("Player ID:%v:\n", player.MemberID))
-	sb.WriteString(fmt.Sprintf("Name: %v\n", player.Name))
-	sb.WriteString(fmt.Sprintf("Live Rating(reg): %v\n", player.RegRating))
-	sb.WriteString(fmt.Sprintf("Live Rating(quick): %v\n", player.QuickRating))
-	sb.WriteString(fmt.Sprintf("Live Rating(blitz): %v\n", player.BlitzRating))
-	sb.WriteString(fmt.Sprintf("Rated Events: %v\n", player.TotalEvents))
-	if len(xTables) > 0 {
-		sb.WriteString(fmt.Sprintf("Most Recent(%v) Results:\n\n",
-			len(xTables)))
-	}
-
-	// Sort events by date
-	var eventIDs []int
-	for id := range xTables {
-		eventIDs = append(eventIDs, id)
-	}
-	sort.Slice(eventIDs, func(i, j int) bool {
-		evI := getEventFromId(player.RecentEvents, eventIDs[i])
-		evJ := getEventFromId(player.RecentEvents, eventIDs[j])
-		return evI.EndDate.After(evJ.EndDate)
-	})
-
-	for _, eventId := range eventIDs {
-		event := getEventFromId(player.RecentEvents, eventId)
-
-		sb.WriteString(fmt.Sprintf("%v - %v\n",
-			event.EndDate.Format("2006-01-02"), event.Name))
-
-		// a player can have multiple cross tables from a single event
-		// if they play in multiple sections. e.g. the player switched
-		// sections during an event, or a td created a side games section
-		for _, xt := range xTables[eventId] {
-			output := buildOneCrossTableOutput(&xt, true, player.MemberID)
-			sb.WriteString(output)
-		}
-	}
-
-	return sb.String()
-}
-
-func getEventFromId(events []uschess.Event, eventId int) uschess.Event {
-	for _, event := range events {
-		if event.ID == eventId {
-			return event
-		}
-	}
-
-	panic("BUG: invariant: eventId should be present in events slice")
-}
-
-func fetchRecentPlayerCrossTables(player *uschess.Player,
-	eventCount int) (map[int][]uschess.CrossTable, error) {
-
-	xTables := make(map[int][]uschess.CrossTable)
-	var mu sync.Mutex
-	g, _ := errgroup.WithContext(context.Background())
-	count := 0
-	for _, ev := range player.RecentEvents {
-		if count >= eventCount {
-			break
-		}
-		count++
-		g.Go(func() error {
-			sections, err := uschess.FetchCrossTables(ev.ID)
-			if err != nil {
-				return fmt.Errorf("error fetching cross tables for event %v: %w",
-					ev.ID, err)
-			}
-			var xts []uschess.CrossTable
-			for _, section := range sections {
-				for _, entry := range section.PlayerEntries {
-					if entry.PlayerId == player.MemberID {
-						xts = append(xts, *section)
-						break
-					}
-				}
-			}
-			if len(xts) > 0 {
-				mu.Lock()
-				xTables[ev.ID] = xts
-				mu.Unlock()
-			}
-			return nil
-		})
-	}
-	if err := g.Wait(); err != nil {
-		return nil, err
-	}
-	return xTables, nil
+	fmt.Printf("%v", report)
 }

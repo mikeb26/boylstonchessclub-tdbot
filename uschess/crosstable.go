@@ -266,3 +266,128 @@ func parseCrossTableEntries(start, numCols int,
 
 	return entries
 }
+
+func BuildOneCrossTableOutput(xt *CrossTable,
+	includeSectionHeader bool, filterPlayerID int) string {
+
+	// If filtering, determine which pair numbers to include (player + opponents)
+	var includeSet map[int]bool
+	var filteredPlayerPairNum int
+	if filterPlayerID != 0 {
+		includeSet = make(map[int]bool)
+		// find player entry
+		for _, e := range xt.PlayerEntries {
+			if e.PlayerId == filterPlayerID {
+				filteredPlayerPairNum = e.PairNum
+				includeSet[e.PairNum] = true
+				// record opponents
+				for _, res := range e.Results {
+					if res.OpponentPairNum > 0 {
+						includeSet[res.OpponentPairNum] = true
+					}
+				}
+				break
+			}
+		}
+	}
+
+	var sb strings.Builder
+
+	if includeSectionHeader {
+		sb.WriteString(fmt.Sprintf("%v\n", xt.SectionName))
+	}
+
+	// Build headers
+	numRounds := xt.NumRounds
+	headers := []string{"No", "Name", "Rating", "Pts"}
+	for i := 1; i <= numRounds; i++ {
+		headers = append(headers, fmt.Sprintf("R%d", i))
+	}
+
+	// Build rows
+	forfeitFound := false
+	var rows [][]string
+	for _, e := range xt.PlayerEntries {
+		playerName := e.PlayerName
+
+		// apply filter
+		if includeSet != nil {
+			if !includeSet[e.PairNum] {
+				continue
+			}
+			if filteredPlayerPairNum == e.PairNum {
+				playerName = fmt.Sprintf("++%v++", playerName)
+			}
+		}
+
+		row := []string{
+			fmt.Sprintf("%d.", e.PairNum),
+			playerName,
+			fmt.Sprintf("%v->%v", e.PlayerRatingPre, e.PlayerRatingPost),
+			fmt.Sprintf("%.1f", e.TotalPoints),
+		}
+		for _, res := range e.Results {
+			var cell string
+			switch res.Outcome {
+			case ResultWin:
+				cell = fmt.Sprintf("W%d", res.OpponentPairNum)
+				cell += fmt.Sprintf("(%c)", res.Color[0])
+			case ResultWinByForfeit:
+				forfeitFound = true
+				cell = fmt.Sprintf("W*")
+			case ResultLoss:
+				cell = fmt.Sprintf("L%d", res.OpponentPairNum)
+				cell += fmt.Sprintf("(%c)", res.Color[0])
+			case ResultLossByForfeit:
+				forfeitFound = true
+				cell = fmt.Sprintf("L*")
+			case ResultDraw:
+				cell = fmt.Sprintf("D%d", res.OpponentPairNum)
+				cell += fmt.Sprintf("(%c)", res.Color[0])
+			case ResultFullBye:
+				cell = "BYE(1.0)"
+			case ResultHalfBye:
+				cell = "BYE(0.5)"
+			case ResultUnplayedGame:
+				cell = "BYE(0.0)"
+			default:
+				cell = "?"
+			}
+			row = append(row, cell)
+		}
+		rows = append(rows, row)
+	}
+
+	// Compute column widths
+	colWidths := make([]int, len(headers))
+	for i, h := range headers {
+		colWidths[i] = len(h)
+	}
+	for _, row := range rows {
+		for i, cell := range row {
+			if len(cell) > colWidths[i] {
+				colWidths[i] = len(cell)
+			}
+		}
+	}
+
+	// Build format string
+	var fmtStrBuilder strings.Builder
+	for _, w := range colWidths {
+		fmtStrBuilder.WriteString(fmt.Sprintf("%%-%ds  ", w))
+	}
+	fmtStr := strings.TrimRight(fmtStrBuilder.String(), " ") + "\n"
+
+	// Write header
+	sb.WriteString(fmt.Sprintf(fmtStr, toAnySlice(headers)...))
+	// Write rows
+	for _, row := range rows {
+		sb.WriteString(fmt.Sprintf(fmtStr, toAnySlice(row)...))
+	}
+	if forfeitFound {
+		sb.WriteString("* indicates game was decided by forfeit\n")
+	}
+	sb.WriteString("\n")
+
+	return sb.String()
+}
