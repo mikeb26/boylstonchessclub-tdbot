@@ -11,7 +11,7 @@ import (
 // Note: This test performs a live lookup against the USCF "thin3" endpoint.
 // Ensure internet connectivity and endpoint availability.
 func TestFetchPlayer(t *testing.T) {
-	const memberID = "12689073"
+	const memberID = 12689073
 	const expectedName = "Michael Brown"
 	const expectedMinEventCount = 48
 

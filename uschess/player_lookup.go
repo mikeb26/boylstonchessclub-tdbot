@@ -19,7 +19,7 @@ import (
 
 // Player holds information about a USCF member.
 type Player struct {
-	MemberID    string
+	MemberID    int
 	Name        string
 	RegRating   string
 	QuickRating string
@@ -37,8 +37,8 @@ type Player struct {
 // latency (>2s). I also considered
 // https://new.uschess.org/civicrm/player-search but this seems like it would
 // have required a headless browser to utilize.
-func FetchPlayer(memberID string) (*Player, error) {
-	endpoint := fmt.Sprintf("https://www.uschess.org/msa/MbrDtlTnmtHst.php?%s", memberID)
+func FetchPlayer(memberID int) (*Player, error) {
+	endpoint := fmt.Sprintf("https://www.uschess.org/msa/MbrDtlTnmtHst.php?%v", memberID)
 
 	req, err := http.NewRequest("GET", endpoint, nil)
 	if err != nil {
@@ -62,11 +62,11 @@ func FetchPlayer(memberID string) (*Player, error) {
 }
 
 // parsePlayerName finds the player's name in a bold tag: "<b>memberID: NAME</b>".
-func parsePlayerName(memberID string, doc *goquery.Document) string {
+func parsePlayerName(memberID int, doc *goquery.Document) string {
 	name := ""
 	doc.Find("b").EachWithBreak(func(i int, s *goquery.Selection) bool {
 		text := strings.TrimSpace(s.Text())
-		prefix := memberID + ":"
+		prefix := fmt.Sprintf("%v:", memberID)
 		if strings.HasPrefix(text, prefix) {
 			name = strings.TrimSpace(strings.TrimPrefix(text, prefix))
 			name = normalizeName(name)
@@ -98,7 +98,7 @@ func parseTotalEvents(player *Player, doc *goquery.Document) {
 }
 
 // parsePlayer parses HTML and extracts the player's name, current ratings, and event history.
-func parsePlayer(memberID string, body io.ReadCloser) (*Player, error) {
+func parsePlayer(memberID int, body io.ReadCloser) (*Player, error) {
 	doc, err := goquery.NewDocumentFromReader(body)
 	if err != nil {
 		return nil, fmt.Errorf("parsing HTML: %w", err)
@@ -107,7 +107,7 @@ func parsePlayer(memberID string, body io.ReadCloser) (*Player, error) {
 	player := Player{MemberID: memberID}
 	player.Name = parsePlayerName(memberID, doc)
 	if player.Name == "" {
-		return nil, fmt.Errorf("player name not found in page for %s", memberID)
+		return nil, fmt.Errorf("player name not found in page for %v", memberID)
 	}
 
 	// Populate total events
@@ -129,7 +129,7 @@ func parseTournamentHistory(player *Player, doc *goquery.Document) error {
 
 	rows := table.Find("tr")
 	if rows.Length() <= 1 {
-		return fmt.Errorf("no tournament entries found for player %s", player.MemberID)
+		return fmt.Errorf("no tournament entries found for player %v", player.MemberID)
 	}
 
 	var events []Event

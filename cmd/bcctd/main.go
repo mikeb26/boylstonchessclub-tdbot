@@ -389,13 +389,13 @@ func handleHistory(args []string) {
 
 func handlePlayer(args []string) {
 	fs := flag.NewFlagSet("player", flag.ExitOnError)
-	memberID := fs.String("id", "", "USCF member id")
+	memberID := fs.Int("id", 0, "USCF member id")
 	eventCount := fs.Int("eventcount", 3,
 		"Number of recent crosstables to retrieve (0-5)")
 	if err := fs.Parse(args); err != nil {
 		os.Exit(1)
 	}
-	if *memberID == "" {
+	if *memberID == 0 {
 		fmt.Fprintln(os.Stderr, "Please provide a valid --id <USCF member id>")
 		fs.Usage()
 		os.Exit(1)
@@ -483,11 +483,6 @@ func fetchRecentPlayerCrossTables(player *uschess.Player,
 
 	xTables := make(map[string][]uschess.CrossTable)
 
-	memberIDInt, err := strconv.Atoi(player.MemberID)
-	if err != nil {
-		return nil, fmt.Errorf("invalid member ID %q: %w", player.MemberID, err)
-	}
-
 	for _, ev := range player.RecentEvents {
 		if len(xTables) >= eventCount {
 			break
@@ -504,7 +499,7 @@ func fetchRecentPlayerCrossTables(player *uschess.Player,
 		xTables[ev.ID] = make([]uschess.CrossTable, 0)
 		for _, section := range sections {
 			for _, entry := range section.PlayerEntries {
-				if entry.PlayerId == memberIDInt {
+				if entry.PlayerId == player.MemberID {
 					xTables[ev.ID] = append(xTables[ev.ID], *section)
 					break
 				}
