@@ -67,14 +67,22 @@ func handleCal(args []string) {
 		os.Exit(1)
 	}
 	// enforce bounds
-	if *days <= 0 {
-		*days = 14
+	if *days < -60 {
+		*days = -60
 	} else if *days > 60 {
 		*days = 60
 	}
 
+	var start time.Time
 	now := time.Now()
 	end := now.AddDate(0, 0, *days)
+
+	if now.After(end) {
+		start = end
+		end = now
+	} else {
+		start = now
+	}
 	// Fetch events from BCC API
 	events, err := bcc.GetEvents()
 	if err != nil {
@@ -83,7 +91,7 @@ func handleCal(args []string) {
 	// Filter and group events by date
 	eventsByDate := make(map[string][]bcc.Event)
 	for _, ev := range events {
-		if ev.Date.Before(now) || ev.Date.After(end) {
+		if ev.Date.Before(start) || ev.Date.After(end) {
 			continue
 		}
 		key := ev.Date.Format("2006-01-02")
@@ -99,7 +107,13 @@ func handleCal(args []string) {
 	for d := range eventsByDate {
 		dates = append(dates, d)
 	}
-	sort.Strings(dates)
+	if start == now {
+		sort.Strings(dates)
+	} else {
+		sort.Slice(dates, func(i, j int) bool {
+			return dates[j] < dates[i]
+		})
+	}
 	for _, d := range dates {
 		fmt.Println(d)
 		for _, ev := range eventsByDate[d] {
