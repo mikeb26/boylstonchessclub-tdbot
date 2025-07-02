@@ -5,6 +5,7 @@
 package main
 
 import (
+	"context"
 	_ "embed"
 	"flag"
 	"fmt"
@@ -13,7 +14,10 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
+
+	"golang.org/x/sync/errgroup"
 
 	"github.com/mikeb26/boylstonchessclub-tdbot/bcc"
 	"github.com/mikeb26/boylstonchessclub-tdbot/internal"
@@ -475,16 +479,16 @@ func getEventFromId(events []uschess.Event, eventId string) uschess.Event {
 	}
 
 	panic("BUG: invariant: eventId should be present in events slice")
-	return uschess.Event{}
 }
 
 func fetchRecentPlayerCrossTables(player *uschess.Player,
 	eventCount int) (map[string][]uschess.CrossTable, error) {
-
 	xTables := make(map[string][]uschess.CrossTable)
-
+	var mu sync.Mutex
+	g, _ := errgroup.WithContext(context.Background())
+	count := 0
 	for _, ev := range player.RecentEvents {
-		if len(xTables) >= eventCount {
+		if count >= eventCount {
 			break
 		}
 		idInt, err := strconv.Atoi(ev.ID)
@@ -492,19 +496,33 @@ func fetchRecentPlayerCrossTables(player *uschess.Player,
 			// skip events with invalid ID
 			continue
 		}
-		sections, err := uschess.FetchCrossTables(idInt)
-		if err != nil {
-			return nil, fmt.Errorf("error fetching cross tables for event %v: %w", ev.ID, err)
-		}
-		xTables[ev.ID] = make([]uschess.CrossTable, 0)
-		for _, section := range sections {
-			for _, entry := range section.PlayerEntries {
-				if entry.PlayerId == player.MemberID {
-					xTables[ev.ID] = append(xTables[ev.ID], *section)
-					break
+		count++
+		eventID := ev.ID
+		eid := idInt
+		g.Go(func() error {
+			sections, err := uschess.FetchCrossTables(eid)
+			if err != nil {
+				return fmt.Errorf("error fetching cross tables for event %v: %w", eventID, err)
+			}
+			var xts []uschess.CrossTable
+			for _, section := range sections {
+				for _, entry := range section.PlayerEntries {
+					if entry.PlayerId == player.MemberID {
+						xts = append(xts, *section)
+						break
+					}
 				}
 			}
-		}
+			if len(xts) > 0 {
+				mu.Lock()
+				xTables[eventID] = xts
+				mu.Unlock()
+			}
+			return nil
+		})
+	}
+	if err := g.Wait(); err != nil {
+		return nil, err
 	}
 	return xTables, nil
 }
