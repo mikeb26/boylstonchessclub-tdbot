@@ -142,7 +142,9 @@ func parseTournamentHistory(player *Player, doc *goquery.Document) error {
 		// Determine if this is a header row by checking small text is numeric ID
 		dateTd := tds.Eq(0)
 		idText := strings.TrimSpace(dateTd.Find("small").Text())
-		if _, err := strconv.Atoi(idText); err != nil {
+		id := 0
+		var err error
+		if id, err = strconv.Atoi(idText); err != nil {
 			// skip header or non-event rows
 			return
 		}
@@ -185,7 +187,7 @@ func parseTournamentHistory(player *Player, doc *goquery.Document) error {
 		events = append(events, Event{
 			EndDate: endDate,
 			Name:    name,
-			ID:      idText,
+			ID:      id,
 		})
 	})
 

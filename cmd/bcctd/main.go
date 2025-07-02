@@ -12,7 +12,6 @@ import (
 	"log"
 	"os"
 	"sort"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -427,7 +426,7 @@ func handlePlayer(args []string) {
 }
 
 func buildPlayerOutput(player *uschess.Player,
-	xTables map[string][]uschess.CrossTable) string {
+	xTables map[int][]uschess.CrossTable) string {
 
 	var sb strings.Builder
 
@@ -443,7 +442,7 @@ func buildPlayerOutput(player *uschess.Player,
 	}
 
 	// Sort events by date
-	var eventIDs []string
+	var eventIDs []int
 	for id := range xTables {
 		eventIDs = append(eventIDs, id)
 	}
@@ -471,7 +470,7 @@ func buildPlayerOutput(player *uschess.Player,
 	return sb.String()
 }
 
-func getEventFromId(events []uschess.Event, eventId string) uschess.Event {
+func getEventFromId(events []uschess.Event, eventId int) uschess.Event {
 	for _, event := range events {
 		if event.ID == eventId {
 			return event
@@ -482,8 +481,9 @@ func getEventFromId(events []uschess.Event, eventId string) uschess.Event {
 }
 
 func fetchRecentPlayerCrossTables(player *uschess.Player,
-	eventCount int) (map[string][]uschess.CrossTable, error) {
-	xTables := make(map[string][]uschess.CrossTable)
+	eventCount int) (map[int][]uschess.CrossTable, error) {
+
+	xTables := make(map[int][]uschess.CrossTable)
 	var mu sync.Mutex
 	g, _ := errgroup.WithContext(context.Background())
 	count := 0
@@ -491,18 +491,12 @@ func fetchRecentPlayerCrossTables(player *uschess.Player,
 		if count >= eventCount {
 			break
 		}
-		idInt, err := strconv.Atoi(ev.ID)
-		if err != nil {
-			// skip events with invalid ID
-			continue
-		}
 		count++
-		eventID := ev.ID
-		eid := idInt
 		g.Go(func() error {
-			sections, err := uschess.FetchCrossTables(eid)
+			sections, err := uschess.FetchCrossTables(ev.ID)
 			if err != nil {
-				return fmt.Errorf("error fetching cross tables for event %v: %w", eventID, err)
+				return fmt.Errorf("error fetching cross tables for event %v: %w",
+					ev.ID, err)
 			}
 			var xts []uschess.CrossTable
 			for _, section := range sections {
@@ -515,7 +509,7 @@ func fetchRecentPlayerCrossTables(player *uschess.Player,
 			}
 			if len(xts) > 0 {
 				mu.Lock()
-				xTables[eventID] = xts
+				xTables[ev.ID] = xts
 				mu.Unlock()
 			}
 			return nil

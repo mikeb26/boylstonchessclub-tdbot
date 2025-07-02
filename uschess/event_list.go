@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -14,7 +15,7 @@ import (
 type Event struct {
 	EndDate time.Time
 	Name    string
-	ID      string
+	ID      int
 }
 
 // GetAffiliateEvents fetches and parses the Affiliate Tournament History page
@@ -65,6 +66,11 @@ func GetAffiliateEvents(affiliateCode string) ([]Event, error) {
 
 		// Extract event ID from <small>
 		id := strings.TrimSpace(dateTd.Find("small").Text())
+		idInt, err := strconv.Atoi(id)
+		if err != nil {
+			// skip events with invalid ID
+			return
+		}
 
 		// Extract event name from the link in the second cell
 		name := strings.TrimSpace(row.Find("td").Eq(1).Find("a").Text())
@@ -78,7 +84,7 @@ func GetAffiliateEvents(affiliateCode string) ([]Event, error) {
 		events = append(events, Event{
 			EndDate: endDate,
 			Name:    name,
-			ID:      id,
+			ID:      idInt,
 		})
 	})
 
@@ -91,6 +97,6 @@ func main() {
 		log.Fatal(err)
 	}
 	for _, e := range events {
-		fmt.Printf("%s\t%s\t%s\n", e.EndDate, e.Name, e.ID)
+		fmt.Printf("%s\t%s\t%v\n", e.EndDate, e.Name, e.ID)
 	}
 }
