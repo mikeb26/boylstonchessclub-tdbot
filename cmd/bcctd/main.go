@@ -34,6 +34,7 @@ var commands = map[string]cmdHandler{
 	"standings":  handleStandings,
 	"crosstable": handleCrossTable,
 	"history":    handleHistory,
+	"player":     handlePlayer,
 }
 
 func main() {
@@ -369,4 +370,60 @@ func handleHistory(args []string) {
 	}
 	fmt.Printf("\nRun '%s crosstable --uscftid ID' to get results from a specific event\n",
 		os.Args[0])
+}
+
+func handlePlayer(args []string) {
+	fs := flag.NewFlagSet("player", flag.ExitOnError)
+	memberID := fs.String("id", "", "USCF member id")
+	eventCount := fs.Int("eventcount", 3,
+		"Number of recent crosstables to retrieve (0-5)")
+	if err := fs.Parse(args); err != nil {
+		os.Exit(1)
+	}
+	if *memberID == "" {
+		fmt.Fprintln(os.Stderr, "Please provide a valid --id <USCF member id>")
+		fs.Usage()
+		os.Exit(1)
+	}
+
+	// enforce bounds
+	if *eventCount <= 0 {
+		*eventCount = 1
+	} else if *eventCount > 5 {
+		*eventCount = 5
+	}
+
+	player, err := uschess.FetchPlayer(*memberID)
+	if err != nil {
+		log.Fatalf("Error fetching player %v: %v", memberID, err)
+	}
+
+	events, err := fetchRecentPlayerEvents(player, *eventCount)
+	if err != nil {
+		log.Fatalf("Error fetching player %v events: %v", memberID, err)
+	}
+	output := buildPlayerOutput(player, events)
+
+	fmt.Printf("%v", output)
+}
+
+func buildPlayerOutput(player *uschess.Player, events []uschess.Event) string {
+	var sb strings.Builder
+
+	sb.WriteString(fmt.Sprintf("Player ID:%v:\n", player.MemberID))
+	sb.WriteString(fmt.Sprintf("\tName: %v\n", player.Name))
+	sb.WriteString(fmt.Sprintf("\tLive Rating(reg): %v\n", player.RegRating))
+	sb.WriteString(fmt.Sprintf("\tLive Rating(quick): %v\n", player.QuickRating))
+	sb.WriteString(fmt.Sprintf("\tLive Rating(blitz): %v\n", player.BlitzRating))
+	sb.WriteString(fmt.Sprintf("\tRated Events: %v\n", len(player.Events)))
+	sb.WriteString(fmt.Sprintf("\tMost Recent(%v) Results:\n", len(events)))
+
+	return sb.String()
+}
+
+func fetchRecentPlayerEvents(player *uschess.Player,
+	eventCount int) ([]uschess.Event, error) {
+
+	events := make([]uschess.Event, 0)
+	return events, nil
 }

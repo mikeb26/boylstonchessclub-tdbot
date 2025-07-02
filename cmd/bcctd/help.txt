@@ -29,3 +29,9 @@ Available Commands:
                          given USCF affiliate (default is Boylston
                          Chess Club) over the specified last number
 			 of days (14 by default if not specified).
+
+  bcctd player [--eventcount <numberOfEvents>] [--id <USCF member id>]
+                         Display information about a player given
+                         their USCF member id. Additionally, retrieve
+                         cross tables for the player's most recent
+                         numberOfEvents (default is 1).
