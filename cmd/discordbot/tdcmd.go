@@ -15,6 +15,7 @@ import (
 	"github.com/bwmarrin/discordgo"
 
 	"github.com/mikeb26/boylstonchessclub-tdbot/bcc"
+	"github.com/mikeb26/boylstonchessclub-tdbot/uschess"
 )
 
 type TdSubCommand string
@@ -26,6 +27,7 @@ const (
 	TdEventCmd     TdSubCommand = "event"
 	TdPairingsCmd  TdSubCommand = "pairings"
 	TdStandingsCmd TdSubCommand = "standings"
+	TdPlayerCmd    TdSubCommand = "player"
 )
 
 var tdSubCmdHdlrs = map[TdSubCommand]CmdHandler{
@@ -35,6 +37,7 @@ var tdSubCmdHdlrs = map[TdSubCommand]CmdHandler{
 	TdEventCmd:     tdEventCmdHandler,
 	TdPairingsCmd:  tdPairingsCmdHandler,
 	TdStandingsCmd: tdStandingsCmdHandler,
+	TdPlayerCmd:    tdPlayerCmdHandler,
 }
 
 func tdCmdHandler(inter *discordgo.Interaction) *discordgo.InteractionResponse {
@@ -333,6 +336,57 @@ func tdStandingsCmdHandler(inter *discordgo.Interaction) *discordgo.InteractionR
 	// Wrap output in code block for monospace formatting in Discord
 	resp.Data.Content =
 		fmt.Sprintf("```\n%s```", bcc.BuildStandingsOutput(tourney))
+
+	if broadcast {
+		resp.Data.Flags = 0
+	}
+
+	return resp
+}
+
+// tdPlayerCmdHandler handles the /td player command to display information
+// regarding a specific player
+func tdPlayerCmdHandler(inter *discordgo.Interaction) *discordgo.InteractionResponse {
+	resp := &discordgo.InteractionResponse{
+		Type: discordgo.InteractionResponseChannelMessageWithSource,
+		Data: &discordgo.InteractionResponseData{
+			Flags: discordgo.MessageFlagsEphemeral,
+		},
+	}
+	data := inter.ApplicationCommandData()
+	broadcast := false // default
+	var memID int64
+	if len(data.Options) > 0 {
+		found := false
+		for _, opt := range data.Options[0].Options {
+			if opt.Name == "memid" {
+				memID = opt.IntValue()
+				found = true
+			} else if opt.Name == "broadcast" {
+				broadcast = opt.BoolValue()
+			}
+		}
+		if !found {
+			resp.Data.Content = "Please provide a USCF member ID."
+			log.Printf("discordbot.player: %v", resp.Data.Content)
+			return resp
+		}
+	} else {
+		resp.Data.Content = "Please provide a USCF member ID."
+		log.Printf("discordbot.player: %v", resp.Data.Content)
+		return resp
+	}
+
+	report, err := uschess.GetPlayerReport(int(memID), 3 /* eventCount */)
+	if err != nil {
+		resp.Data.Content = fmt.Sprintf("Error fetching player %v report: %v",
+			memID, err)
+		log.Printf("discordbot.player: %v", resp.Data.Content)
+		return resp
+	}
+
+	// Wrap output in code block for monospace formatting in Discord
+	resp.Data.Content = fmt.Sprintf("```\n%s```", report)
 
 	if broadcast {
 		resp.Data.Flags = 0

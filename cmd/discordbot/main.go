@@ -243,6 +243,25 @@ func registerSlashCommands() {
 					},
 				},
 			},
+			{
+				Type:        discordgo.ApplicationCommandOptionSubCommand,
+				Name:        string(TdPlayerCmd),
+				Description: "Get information regarding a specific player",
+				Options: []*discordgo.ApplicationCommandOption{
+					{
+						Type:        discordgo.ApplicationCommandOptionInteger,
+						Name:        "memid",
+						Description: "USCF member id of the player",
+						Required:    true,
+					},
+					{
+						Type:        discordgo.ApplicationCommandOptionBoolean,
+						Name:        "broadcast",
+						Description: "Share with the rest of the channel instead of	only to you (default is false)",
+						Required:    false,
+					},
+				},
+			},
 		},
 	}
 
