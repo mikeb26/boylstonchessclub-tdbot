@@ -164,7 +164,7 @@ func parseCrossTableEntries(start, numCols int,
 	digitsRe := regexp.MustCompile(`\d+`)
 	dataLineRe := regexp.MustCompile(`^\s*\d+\s*\|`)
 	// Match playerID and pre->post ratings, capturing raw rating strings
-	idRe := regexp.MustCompile(`^(\d+)\s*/\s*R:\s*(.*?)\s*->\s*(.*?)$`)
+	idRe := regexp.MustCompile(`^(\d+)\s*/\s*[^:]+:\s*(.*?)\s*->\s*(.*?)$`)
 
 	var entries []CrossTableEntry
 	for j := start; j+1 < len(lines); j++ {
