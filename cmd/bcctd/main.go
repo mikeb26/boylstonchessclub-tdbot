@@ -11,6 +11,7 @@ import (
 	"log"
 	"os"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -401,7 +402,7 @@ func handlePlayer(args []string) {
 	}
 
 	// enforce bounds
-	if *eventCount <= 0 {
+	if *eventCount < 0 {
 		*eventCount = 1
 	} else if *eventCount > 5 {
 		*eventCount = 5
@@ -412,32 +413,103 @@ func handlePlayer(args []string) {
 		log.Fatalf("Error fetching player %v: %v", memberID, err)
 	}
 
-	events, err := fetchRecentPlayerEvents(player, *eventCount)
+	xTables, err := fetchRecentPlayerCrossTables(player, *eventCount)
 	if err != nil {
 		log.Fatalf("Error fetching player %v events: %v", memberID, err)
 	}
-	output := buildPlayerOutput(player, events)
+	output := buildPlayerOutput(player, xTables)
 
 	fmt.Printf("%v", output)
 }
 
-func buildPlayerOutput(player *uschess.Player, events []uschess.Event) string {
+func buildPlayerOutput(player *uschess.Player,
+	xTables map[string][]uschess.CrossTable) string {
+
 	var sb strings.Builder
 
 	sb.WriteString(fmt.Sprintf("Player ID:%v:\n", player.MemberID))
-	sb.WriteString(fmt.Sprintf("\tName: %v\n", player.Name))
-	sb.WriteString(fmt.Sprintf("\tLive Rating(reg): %v\n", player.RegRating))
-	sb.WriteString(fmt.Sprintf("\tLive Rating(quick): %v\n", player.QuickRating))
-	sb.WriteString(fmt.Sprintf("\tLive Rating(blitz): %v\n", player.BlitzRating))
-	sb.WriteString(fmt.Sprintf("\tRated Events: %v\n", len(player.Events)))
-	sb.WriteString(fmt.Sprintf("\tMost Recent(%v) Results:\n", len(events)))
+	sb.WriteString(fmt.Sprintf("Name: %v\n", player.Name))
+	sb.WriteString(fmt.Sprintf("Live Rating(reg): %v\n", player.RegRating))
+	sb.WriteString(fmt.Sprintf("Live Rating(quick): %v\n", player.QuickRating))
+	sb.WriteString(fmt.Sprintf("Live Rating(blitz): %v\n", player.BlitzRating))
+	sb.WriteString(fmt.Sprintf("Rated Events: %v\n", player.TotalEvents))
+	if len(xTables) > 0 {
+		sb.WriteString(fmt.Sprintf("Most Recent(%v) Results:\n\n",
+			len(xTables)))
+	}
+
+	// Sort events by date
+	var eventIDs []string
+	for id := range xTables {
+		eventIDs = append(eventIDs, id)
+	}
+	sort.Slice(eventIDs, func(i, j int) bool {
+		evI := getEventFromId(player.RecentEvents, eventIDs[i])
+		evJ := getEventFromId(player.RecentEvents, eventIDs[j])
+		return evI.EndDate.After(evJ.EndDate)
+	})
+
+	for _, eventId := range eventIDs {
+		event := getEventFromId(player.RecentEvents, eventId)
+
+		sb.WriteString(fmt.Sprintf("%v - %v\n",
+			event.EndDate.Format("2006-01-02"), event.Name))
+
+		// a player can have multiple cross tables from a single event
+		// if they play in multiple sections. e.g. the player switched
+		// sections during an event, or a td created a side games section
+		for _, xt := range xTables[eventId] {
+			output := buildOneCrossTableOutput(&xt, true)
+			sb.WriteString(output)
+		}
+	}
 
 	return sb.String()
 }
 
-func fetchRecentPlayerEvents(player *uschess.Player,
-	eventCount int) ([]uschess.Event, error) {
+func getEventFromId(events []uschess.Event, eventId string) uschess.Event {
+	for _, event := range events {
+		if event.ID == eventId {
+			return event
+		}
+	}
 
-	events := make([]uschess.Event, 0)
-	return events, nil
+	panic("BUG: invariant: eventId should be present in events slice")
+	return uschess.Event{}
+}
+
+func fetchRecentPlayerCrossTables(player *uschess.Player,
+	eventCount int) (map[string][]uschess.CrossTable, error) {
+
+	xTables := make(map[string][]uschess.CrossTable)
+
+	memberIDInt, err := strconv.Atoi(player.MemberID)
+	if err != nil {
+		return nil, fmt.Errorf("invalid member ID %q: %w", player.MemberID, err)
+	}
+
+	for _, ev := range player.RecentEvents {
+		if len(xTables) >= eventCount {
+			break
+		}
+		idInt, err := strconv.Atoi(ev.ID)
+		if err != nil {
+			// skip events with invalid ID
+			continue
+		}
+		sections, err := uschess.FetchCrossTables(idInt)
+		if err != nil {
+			return nil, fmt.Errorf("error fetching cross tables for event %v: %w", ev.ID, err)
+		}
+		xTables[ev.ID] = make([]uschess.CrossTable, 0)
+		for _, section := range sections {
+			for _, entry := range section.PlayerEntries {
+				if entry.PlayerId == memberIDInt {
+					xTables[ev.ID] = append(xTables[ev.ID], *section)
+					break
+				}
+			}
+		}
+	}
+	return xTables, nil
 }
