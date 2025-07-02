@@ -223,13 +223,34 @@ func handleCrossTable(args []string) {
 	}
 
 	for _, xt := range xTables {
-		output := buildOneCrossTableOutput(xt, len(xTables) > 1)
+		output := buildOneCrossTableOutput(xt, len(xTables) > 1, 0)
 		fmt.Printf(output)
 	}
 }
 
 func buildOneCrossTableOutput(xt *uschess.CrossTable,
-	includeSectionHeader bool) string {
+	includeSectionHeader bool, filterPlayerID int) string {
+
+	// If filtering, determine which pair numbers to include (player + opponents)
+	var includeSet map[int]bool
+	var filteredPlayerPairNum int
+	if filterPlayerID != 0 {
+		includeSet = make(map[int]bool)
+		// find player entry
+		for _, e := range xt.PlayerEntries {
+			if e.PlayerId == filterPlayerID {
+				filteredPlayerPairNum = e.PairNum
+				includeSet[e.PairNum] = true
+				// record opponents
+				for _, res := range e.Results {
+					if res.OpponentPairNum > 0 {
+						includeSet[res.OpponentPairNum] = true
+					}
+				}
+				break
+			}
+		}
+	}
 
 	var sb strings.Builder
 
@@ -248,9 +269,21 @@ func buildOneCrossTableOutput(xt *uschess.CrossTable,
 	forfeitFound := false
 	var rows [][]string
 	for _, e := range xt.PlayerEntries {
+		playerName := e.PlayerName
+
+		// apply filter
+		if includeSet != nil {
+			if !includeSet[e.PairNum] {
+				continue
+			}
+			if filteredPlayerPairNum == e.PairNum {
+				playerName = fmt.Sprintf("++%v++", playerName)
+			}
+		}
+
 		row := []string{
 			fmt.Sprintf("%d.", e.PairNum),
-			e.PlayerName,
+			playerName,
 			fmt.Sprintf("%v->%v", e.PlayerRatingPre, e.PlayerRatingPost),
 			fmt.Sprintf("%.1f", e.TotalPoints),
 		}
@@ -462,7 +495,7 @@ func buildPlayerOutput(player *uschess.Player,
 		// if they play in multiple sections. e.g. the player switched
 		// sections during an event, or a td created a side games section
 		for _, xt := range xTables[eventId] {
-			output := buildOneCrossTableOutput(&xt, true)
+			output := buildOneCrossTableOutput(&xt, true, player.MemberID)
 			sb.WriteString(output)
 		}
 	}
