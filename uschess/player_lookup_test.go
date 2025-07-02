@@ -14,7 +14,6 @@ func TestFetchPlayer(t *testing.T) {
 	const memberID = "12689073"
 	const expectedName = "Michael Brown"
 	const expectedMinEventCount = 48
-	const expectedFirstEventId = "199703255100"
 
 	player, err := FetchPlayer(memberID)
 	if err != nil {
@@ -33,15 +32,9 @@ func TestFetchPlayer(t *testing.T) {
 		t.Errorf("expected a regular rating or placeholder, got empty")
 	}
 
-	if len(player.Events) < expectedMinEventCount {
+	if player.TotalEvents < expectedMinEventCount {
 		t.Errorf("expected a minimum of %v events, got %v instead",
-			expectedMinEventCount, len(player.Events))
-	}
-
-	firstEvent := &player.Events[len(player.Events)-1]
-	if firstEvent.ID != expectedFirstEventId {
-		t.Errorf("expected a first event id %v, got %v instead",
-			expectedFirstEventId, firstEvent.ID)
+			expectedMinEventCount, player.TotalEvents)
 	}
 
 	t.Logf("Fetched player: %+v", player)

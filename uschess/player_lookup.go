@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -23,7 +24,9 @@ type Player struct {
 	RegRating   string
 	QuickRating string
 	BlitzRating string
-	Events      []Event
+	TotalEvents int
+	// up to 50
+	RecentEvents []Event
 }
 
 // FetchPlayer retrieves player information for the given USCF member ID using
@@ -74,6 +77,26 @@ func parsePlayerName(memberID string, doc *goquery.Document) string {
 	return name
 }
 
+// parseTotalEvents finds the total number of events listed on the page.
+func parseTotalEvents(player *Player, doc *goquery.Document) {
+	doc.Find("b").EachWithBreak(func(i int, s *goquery.Selection) bool {
+		text := strings.TrimSpace(s.Text())
+		if strings.HasPrefix(text, "Events for this player") {
+			// Expect format: "Events for this player since late 1991: 583"
+			parts := strings.Split(text, ":")
+			if len(parts) >= 2 {
+				numStr := strings.TrimSpace(parts[len(parts)-1])
+				n, err := strconv.Atoi(numStr)
+				if err == nil {
+					player.TotalEvents = n
+				}
+			}
+			return false // found, stop
+		}
+		return true // continue
+	})
+}
+
 // parsePlayer parses HTML and extracts the player's name, current ratings, and event history.
 func parsePlayer(memberID string, body io.ReadCloser) (*Player, error) {
 	doc, err := goquery.NewDocumentFromReader(body)
@@ -86,6 +109,9 @@ func parsePlayer(memberID string, body io.ReadCloser) (*Player, error) {
 	if player.Name == "" {
 		return nil, fmt.Errorf("player name not found in page for %s", memberID)
 	}
+
+	// Populate total events
+	parseTotalEvents(&player, doc)
 
 	if err := parseTournamentHistory(&player, doc); err != nil {
 		return nil, err
@@ -107,25 +133,26 @@ func parseTournamentHistory(player *Player, doc *goquery.Document) error {
 	}
 
 	var events []Event
-	rows.Each(func(i int, row *goquery.Selection) {
-		// Skip header row
-		if i == 0 {
-			return
-		}
+	rows.Each(func(_ int, row *goquery.Selection) {
 		tds := row.Find("td")
 		if tds.Length() < 5 {
 			return
 		}
 
-		// Parse end date and ID from first cell
+		// Determine if this is a header row by checking small text is numeric ID
 		dateTd := tds.Eq(0)
-		// Text node before <small>
+		idText := strings.TrimSpace(dateTd.Find("small").Text())
+		if _, err := strconv.Atoi(idText); err != nil {
+			// skip header or non-event rows
+			return
+		}
+
+		// Parse end date
 		dateStr := strings.TrimSpace(
 			dateTd.Contents().FilterFunction(func(i int, s *goquery.Selection) bool {
 				return goquery.NodeName(s) == "#text"
 			}).Text(),
 		)
-		id := strings.TrimSpace(dateTd.Find("small").Text())
 		endDate, err := internal.ParseDateOrZero(dateStr)
 		if err != nil {
 			endDate = time.Time{}
@@ -134,23 +161,49 @@ func parseTournamentHistory(player *Player, doc *goquery.Document) error {
 		// Parse event name from second cell link
 		name := strings.TrimSpace(tds.Eq(1).Find("a").Text())
 
-		// On first entry, extract current ratings
-		if i == 1 {
-			player.RegRating = getRatingFromCell(tds.Eq(2))
-			player.QuickRating = getRatingFromCell(tds.Eq(3))
-			player.BlitzRating = getRatingFromCell(tds.Eq(4))
+		// Extract current ratings: first non-unrated encountered is
+		// considered current
+		if player.RegRating == "" {
+			r := getRatingFromCell(tds.Eq(2))
+			if r != "<unrated>" {
+				player.RegRating = r
+			}
+		}
+		if player.QuickRating == "" {
+			q := getRatingFromCell(tds.Eq(3))
+			if q != "<unrated>" {
+				player.QuickRating = q
+			}
+		}
+		if player.BlitzRating == "" {
+			b := getRatingFromCell(tds.Eq(4))
+			if b != "<unrated>" {
+				player.BlitzRating = b
+			}
 		}
 
 		events = append(events, Event{
 			EndDate: endDate,
 			Name:    name,
-			ID:      id,
+			ID:      idText,
 		})
 	})
+
+	// Ensure ratings are set
+	if player.RegRating == "" {
+		player.RegRating = "<unrated>"
+	}
+	if player.QuickRating == "" {
+		player.QuickRating = "<unrated>"
+	}
+	if player.BlitzRating == "" {
+		player.BlitzRating = "<unrated>"
+	}
+
 	sort.Slice(events, func(i, j int) bool {
 		return events[j].EndDate.Before(events[i].EndDate)
 	})
-	player.Events = events
+	player.RecentEvents = events
 	return nil
 }
 
