@@ -5,12 +5,15 @@
 package uschess
 
 import (
+	"context"
 	"strings"
 	"testing"
 )
 
 func TestFetchCrossTables202506242722(t *testing.T) {
-	cts, err := FetchCrossTables(202506242722)
+	ctx := context.Background()
+
+	cts, err := FetchCrossTables(ctx, 202506242722)
 	if err != nil {
 		t.Fatalf("FetchCrossTables error: %v", err)
 	}

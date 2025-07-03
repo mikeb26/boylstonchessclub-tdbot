@@ -5,6 +5,7 @@
 package main
 
 import (
+	"context"
 	_ "embed"
 	"fmt"
 	"log"
@@ -40,7 +41,9 @@ var tdSubCmdHdlrs = map[TdSubCommand]CmdHandler{
 	TdPlayerCmd:    tdPlayerCmdHandler,
 }
 
-func tdCmdHandler(inter *discordgo.Interaction) *discordgo.InteractionResponse {
+func tdCmdHandler(ctx context.Context,
+	inter *discordgo.Interaction) *discordgo.InteractionResponse {
+
 	data := inter.ApplicationCommandData()
 	hdlr := tdHelpCmdHandler
 	if len(data.Options) > 0 {
@@ -51,13 +54,15 @@ func tdCmdHandler(inter *discordgo.Interaction) *discordgo.InteractionResponse {
 			}
 		}
 	}
-	return hdlr(inter)
+	return hdlr(ctx, inter)
 }
 
 //go:embed about.txt
 var aboutText string
 
-func tdAboutCmdHandler(inter *discordgo.Interaction) *discordgo.InteractionResponse {
+func tdAboutCmdHandler(ctx context.Context,
+	inter *discordgo.Interaction) *discordgo.InteractionResponse {
+
 	resp := &discordgo.InteractionResponse{
 		Type: discordgo.InteractionResponseChannelMessageWithSource,
 		Data: &discordgo.InteractionResponseData{
@@ -73,7 +78,9 @@ func tdAboutCmdHandler(inter *discordgo.Interaction) *discordgo.InteractionRespo
 //go:embed help.md
 var helpText string
 
-func tdHelpCmdHandler(inter *discordgo.Interaction) *discordgo.InteractionResponse {
+func tdHelpCmdHandler(ctx context.Context,
+	inter *discordgo.Interaction) *discordgo.InteractionResponse {
+
 	resp := &discordgo.InteractionResponse{
 		Type: discordgo.InteractionResponseChannelMessageWithSource,
 		Data: &discordgo.InteractionResponseData{
@@ -85,7 +92,9 @@ func tdHelpCmdHandler(inter *discordgo.Interaction) *discordgo.InteractionRespon
 	return resp
 }
 
-func tdCalCmdHandler(inter *discordgo.Interaction) *discordgo.InteractionResponse {
+func tdCalCmdHandler(ctx context.Context,
+	inter *discordgo.Interaction) *discordgo.InteractionResponse {
+
 	resp := &discordgo.InteractionResponse{
 		Type: discordgo.InteractionResponseChannelMessageWithSource,
 		Data: &discordgo.InteractionResponseData{
@@ -162,7 +171,9 @@ func tdCalCmdHandler(inter *discordgo.Interaction) *discordgo.InteractionRespons
 	return resp
 }
 
-func tdEventCmdHandler(inter *discordgo.Interaction) *discordgo.InteractionResponse {
+func tdEventCmdHandler(ctx context.Context,
+	inter *discordgo.Interaction) *discordgo.InteractionResponse {
+
 	resp := &discordgo.InteractionResponse{
 		Type: discordgo.InteractionResponseChannelMessageWithSource,
 		Data: &discordgo.InteractionResponseData{
@@ -239,7 +250,9 @@ func tdEventCmdHandler(inter *discordgo.Interaction) *discordgo.InteractionRespo
 }
 
 // tdPairingsCmdHandler handles the /td pairings command to display current pairings
-func tdPairingsCmdHandler(inter *discordgo.Interaction) *discordgo.InteractionResponse {
+func tdPairingsCmdHandler(ctx context.Context,
+	inter *discordgo.Interaction) *discordgo.InteractionResponse {
+
 	resp := &discordgo.InteractionResponse{
 		Type: discordgo.InteractionResponseChannelMessageWithSource,
 		Data: &discordgo.InteractionResponseData{
@@ -295,7 +308,9 @@ func tdPairingsCmdHandler(inter *discordgo.Interaction) *discordgo.InteractionRe
 
 // tdStandingsCmdHandler handles the /td pairings command to display current
 // standings
-func tdStandingsCmdHandler(inter *discordgo.Interaction) *discordgo.InteractionResponse {
+func tdStandingsCmdHandler(ctx context.Context,
+	inter *discordgo.Interaction) *discordgo.InteractionResponse {
+
 	resp := &discordgo.InteractionResponse{
 		Type: discordgo.InteractionResponseChannelMessageWithSource,
 		Data: &discordgo.InteractionResponseData{
@@ -347,7 +362,9 @@ func tdStandingsCmdHandler(inter *discordgo.Interaction) *discordgo.InteractionR
 
 // tdPlayerCmdHandler handles the /td player command to display information
 // regarding a specific player
-func tdPlayerCmdHandler(inter *discordgo.Interaction) *discordgo.InteractionResponse {
+func tdPlayerCmdHandler(ctx context.Context,
+	inter *discordgo.Interaction) *discordgo.InteractionResponse {
+
 	resp := &discordgo.InteractionResponse{
 		Type: discordgo.InteractionResponseChannelMessageWithSource,
 		Data: &discordgo.InteractionResponseData{
@@ -378,7 +395,7 @@ func tdPlayerCmdHandler(inter *discordgo.Interaction) *discordgo.InteractionResp
 		return resp
 	}
 
-	report, err := uschess.GetPlayerReport(int(memID), 3 /* eventCount */)
+	report, err := uschess.GetPlayerReport(ctx, int(memID), 3 /* eventCount */)
 	if err != nil {
 		resp.Data.Content = fmt.Sprintf("Error fetching player %v report: %v",
 			memID, err)

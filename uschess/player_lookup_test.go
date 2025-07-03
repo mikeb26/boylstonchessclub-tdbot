@@ -5,17 +5,20 @@
 package uschess
 
 import (
+	"context"
 	"testing"
 )
 
 // Note: This test performs a live lookup against the USCF "thin3" endpoint.
 // Ensure internet connectivity and endpoint availability.
 func TestFetchPlayer(t *testing.T) {
+	ctx := context.Background()
+
 	const memberID = 12689073
 	const expectedName = "Michael Brown"
 	const expectedMinEventCount = 48
 
-	player, err := FetchPlayer(memberID)
+	player, err := FetchPlayer(ctx, memberID)
 	if err != nil {
 		t.Fatalf("FetchPlayer(%q) returned error: %v", memberID, err)
 	}

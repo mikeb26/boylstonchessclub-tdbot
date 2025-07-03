@@ -5,6 +5,7 @@
 package main
 
 import (
+	"context"
 	_ "embed"
 	"fmt"
 	"time"
@@ -17,8 +18,10 @@ import (
 // this program exists just to seed the http cache for bcc members
 
 func main() {
+	ctx := context.Background()
+
 	for _, memId := range bcc.ActivePlayerMemIds() {
-		player, err := uschess.FetchPlayer(memId)
+		player, err := uschess.FetchPlayer(ctx, memId)
 		time.Sleep(2 * time.Second) // avoid pegging uschess.org
 		if err != nil {
 			// best effort
@@ -29,7 +32,7 @@ func main() {
 	}
 
 	for _, tid := range bcc.ActivePlayerTIds() {
-		_, err := uschess.FetchCrossTables(tid)
+		_, err := uschess.FetchCrossTables(ctx, tid)
 		time.Sleep(2 * time.Second) // avoid pegging uschess.org
 		if err != nil {
 			// best effort
@@ -39,13 +42,13 @@ func main() {
 		fmt.Printf("seeded tid:%v\n", tid)
 	}
 
-	events, err := uschess.GetAffiliateEvents(internal.BccUSCFAffiliateID)
+	events, err := uschess.GetAffiliateEvents(ctx, internal.BccUSCFAffiliateID)
 	if err != nil {
 		// best effort
 		return
 	}
 	for _, event := range events {
-		_, err := uschess.FetchCrossTables(event.ID)
+		_, err := uschess.FetchCrossTables(ctx, event.ID)
 		time.Sleep(2 * time.Second) // avoid pegging uschess.org
 		if err != nil {
 			// best effort

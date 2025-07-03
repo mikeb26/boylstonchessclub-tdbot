@@ -16,13 +16,15 @@ import (
 
 // Retrieve player information including crosstables from the specified number
 // of most recent events. Return the result in string form.
-func GetPlayerReport(memberID int, eventCount int) (string, error) {
-	player, err := FetchPlayer(memberID)
+func GetPlayerReport(ctx context.Context, memberID int,
+	eventCount int) (string, error) {
+
+	player, err := FetchPlayer(ctx, memberID)
 	if err != nil {
 		return "", err
 	}
 
-	xTables, err := fetchRecentPlayerCrossTables(player, eventCount)
+	xTables, err := fetchRecentPlayerCrossTables(ctx, player, eventCount)
 	if err != nil {
 		return "", err
 	}
@@ -87,12 +89,12 @@ func getEventFromId(events []Event, eventId int) Event {
 	panic("BUG: invariant: eventId should be present in events slice")
 }
 
-func fetchRecentPlayerCrossTables(player *Player,
+func fetchRecentPlayerCrossTables(ctx context.Context, player *Player,
 	eventCount int) (map[int][]CrossTable, error) {
 
 	xTables := make(map[int][]CrossTable)
 	var mu sync.Mutex
-	g, _ := errgroup.WithContext(context.Background())
+	g, _ := errgroup.WithContext(ctx)
 	count := 0
 	for _, ev := range player.RecentEvents {
 		if count >= eventCount {
@@ -100,7 +102,7 @@ func fetchRecentPlayerCrossTables(player *Player,
 		}
 		count++
 		g.Go(func() error {
-			sections, err := FetchCrossTables(ev.ID)
+			sections, err := FetchCrossTables(ctx, ev.ID)
 			if err != nil {
 				return fmt.Errorf("error fetching cross tables for event %v: %w",
 					ev.ID, err)

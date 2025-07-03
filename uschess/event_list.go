@@ -22,7 +22,7 @@ type Event struct {
 
 // GetAffiliateEvents fetches and parses the Affiliate Tournament History page
 // for the given affiliate code and returns a slice of Event.
-func GetAffiliateEvents(affiliateCode string) ([]Event, error) {
+func GetAffiliateEvents(ctx context.Context, affiliateCode string) ([]Event, error) {
 
 	url := fmt.Sprintf("https://www.uschess.org/msa/AffDtlTnmtHst.php?%s",
 		affiliateCode)
@@ -33,7 +33,7 @@ func GetAffiliateEvents(affiliateCode string) ([]Event, error) {
 	}
 	req.Header.Set("User-Agent", internal.UserAgent)
 
-	client := httpcache.NewCachedHttpClient(context.Background(), 24*time.Hour)
+	client := httpcache.NewCachedHttpClient(ctx, 24*time.Hour)
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, err

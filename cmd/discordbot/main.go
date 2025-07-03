@@ -5,6 +5,7 @@
 package main
 
 import (
+	"context"
 	"crypto/ed25519"
 	"crypto/sha256"
 	"encoding/hex"
@@ -40,7 +41,8 @@ const (
 	TdCmd TopLevelCommand = "td"
 )
 
-type CmdHandler func(i *discordgo.Interaction) *discordgo.InteractionResponse
+type CmdHandler func(ctx context.Context,
+	i *discordgo.Interaction) *discordgo.InteractionResponse
 
 var topLevelCmdHdlrs = map[TopLevelCommand]CmdHandler{
 	TdCmd: tdCmdHandler,
@@ -85,7 +87,7 @@ func interactionHandler(w http.ResponseWriter, r *http.Request) {
 				Flags: discordgo.MessageFlagsEphemeral,
 			}
 		} else {
-			resp = hdlr(&inter)
+			resp = hdlr(r.Context(), &inter)
 		}
 	} else {
 		log.Printf("discordbot.int: unimplemented interation type %v: inter:%v",

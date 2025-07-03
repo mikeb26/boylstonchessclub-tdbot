@@ -39,7 +39,7 @@ type Player struct {
 // latency (>2s). I also considered
 // https://new.uschess.org/civicrm/player-search but this seems like it would
 // have required a headless browser to utilize.
-func FetchPlayer(memberID int) (*Player, error) {
+func FetchPlayer(ctx context.Context, memberID int) (*Player, error) {
 	endpoint := fmt.Sprintf("https://www.uschess.org/msa/MbrDtlTnmtHst.php?%v", memberID)
 
 	req, err := http.NewRequest("GET", endpoint, nil)
@@ -48,7 +48,7 @@ func FetchPlayer(memberID int) (*Player, error) {
 	}
 	req.Header.Set("User-Agent", internal.UserAgent)
 
-	client := httpcache.NewCachedHttpClient(context.Background(), 24*time.Hour)
+	client := httpcache.NewCachedHttpClient(ctx, 24*time.Hour)
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("performing HTTP GET: %w", err)

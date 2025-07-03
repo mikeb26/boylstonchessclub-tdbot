@@ -61,7 +61,7 @@ type CrossTable struct {
 }
 
 // FetchCrossTable retrieves all sections' cross tables from the given id.
-func FetchCrossTables(id int) ([]*CrossTable, error) {
+func FetchCrossTables(ctx context.Context, id int) ([]*CrossTable, error) {
 	url := fmt.Sprintf("https://www.uschess.org/msa/XtblMain.php?%v.0", id)
 
 	req, err := http.NewRequest("GET", url, nil)
@@ -72,7 +72,7 @@ func FetchCrossTables(id int) ([]*CrossTable, error) {
 
 	// these are rarely (if ever) updated so 1 month cache is fine for our use
 	// case
-	client := httpcache.NewCachedHttpClient(context.Background(), 30*24*time.Hour)
+	client := httpcache.NewCachedHttpClient(ctx, 30*24*time.Hour)
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("unable to fetch uscf crosstable (do): %w", err)

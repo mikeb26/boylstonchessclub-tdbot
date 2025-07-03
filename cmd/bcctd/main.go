@@ -5,6 +5,7 @@
 package main
 
 import (
+	"context"
 	_ "embed"
 	"flag"
 	"fmt"
@@ -22,7 +23,7 @@ import (
 var helpText string
 
 // cmdHandler defines the signature for command handler functions.
-type cmdHandler func(args []string)
+type cmdHandler func(ctx context.Context, args []string)
 
 // commands maps command names to their respective handler functions.
 var commands = map[string]cmdHandler{
@@ -37,13 +38,15 @@ var commands = map[string]cmdHandler{
 }
 
 func main() {
+	ctx := context.Background()
+
 	if len(os.Args) < 2 {
 		usage()
 		os.Exit(1)
 	}
 	cmd := os.Args[1]
 	if handler, ok := commands[cmd]; ok {
-		handler(os.Args[2:])
+		handler(ctx, os.Args[2:])
 	} else {
 		fmt.Fprintf(os.Stderr, "Unknown command: %s\n", cmd)
 		usage()
@@ -55,11 +58,11 @@ func usage() {
 	fmt.Printf("%v", helpText)
 }
 
-func handleHelp(args []string) {
+func handleHelp(ctx context.Context, args []string) {
 	usage()
 }
 
-func handleCal(args []string) {
+func handleCal(ctx context.Context, args []string) {
 	fs := flag.NewFlagSet("cal", flag.ExitOnError)
 	days := fs.Int("days", 14, "Number of days to retrieve (1-60)")
 	if err := fs.Parse(args); err != nil {
@@ -123,7 +126,7 @@ func handleCal(args []string) {
 		os.Args[0])
 }
 
-func handleEvent(args []string) {
+func handleEvent(ctx context.Context, args []string) {
 	fs := flag.NewFlagSet("event", flag.ExitOnError)
 	eventID := fs.Int("eventid", 0, "Event ID to fetch details for")
 	if err := fs.Parse(args); err != nil {
@@ -162,7 +165,7 @@ func handleEvent(args []string) {
 	fmt.Printf("URL: https://boylstonchess.org/events/%d\n", detail.EventID)
 }
 
-func handlePairings(args []string) {
+func handlePairings(ctx context.Context, args []string) {
 	fs := flag.NewFlagSet("pairings", flag.ExitOnError)
 	eventID := fs.Int("eventid", 0, "Event ID to fetch pairings for")
 	if err := fs.Parse(args); err != nil {
@@ -181,7 +184,7 @@ func handlePairings(args []string) {
 	fmt.Print(output)
 }
 
-func handleStandings(args []string) {
+func handleStandings(ctx context.Context, args []string) {
 	fs := flag.NewFlagSet("standings", flag.ExitOnError)
 	eventID := fs.Int("eventid", 0, "Event ID to fetch standings for")
 	if err := fs.Parse(args); err != nil {
@@ -200,7 +203,7 @@ func handleStandings(args []string) {
 	fmt.Print(output)
 }
 
-func handleCrossTable(args []string) {
+func handleCrossTable(ctx context.Context, args []string) {
 	fs := flag.NewFlagSet("crosstable", flag.ExitOnError)
 	tid := fs.Int("uscftid", 0, "USCF Tournament ID")
 	if err := fs.Parse(args); err != nil {
@@ -212,7 +215,7 @@ func handleCrossTable(args []string) {
 		os.Exit(1)
 	}
 
-	xTables, err := uschess.FetchCrossTables(*tid)
+	xTables, err := uschess.FetchCrossTables(ctx, *tid)
 	if err != nil {
 		log.Fatalf("Error fetching cross tables %d: %v", *tid, err)
 	}
@@ -223,7 +226,7 @@ func handleCrossTable(args []string) {
 	}
 }
 
-func handleHistory(args []string) {
+func handleHistory(ctx context.Context, args []string) {
 	fs := flag.NewFlagSet("history", flag.ExitOnError)
 	days := fs.Int("days", 14, "Number of days to retrieve (1-60)")
 	aid := fs.String("uscfaid", internal.BccUSCFAffiliateID, "USCF Affiliate ID")
@@ -246,7 +249,7 @@ func handleHistory(args []string) {
 	now := time.Now()
 	end := now.AddDate(0, 0, -*days)
 
-	events, err := uschess.GetAffiliateEvents(*aid)
+	events, err := uschess.GetAffiliateEvents(ctx, *aid)
 	if err != nil {
 		log.Fatalf("Error fetching events for aid:%v: %v", *aid, err)
 	}
@@ -284,7 +287,7 @@ func handleHistory(args []string) {
 		os.Args[0])
 }
 
-func handlePlayer(args []string) {
+func handlePlayer(ctx context.Context, args []string) {
 	fs := flag.NewFlagSet("player", flag.ExitOnError)
 	memberID := fs.Int("id", 0, "USCF member id")
 	eventCount := fs.Int("eventcount", 3,
@@ -305,7 +308,7 @@ func handlePlayer(args []string) {
 		*eventCount = 5
 	}
 
-	report, err := uschess.GetPlayerReport(*memberID, *eventCount)
+	report, err := uschess.GetPlayerReport(ctx, *memberID, *eventCount)
 	if err != nil {
 		log.Fatalf("Error fetching player %v: %v", memberID, err)
 	}

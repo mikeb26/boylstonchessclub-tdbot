@@ -5,6 +5,7 @@
 package main
 
 import (
+	"context"
 	"strings"
 	"testing"
 
@@ -12,6 +13,8 @@ import (
 )
 
 func TestTdCalCmdHandler(t *testing.T) {
+	ctx := context.Background()
+
 	// Construct a fake interaction for an application command with no options
 	inter := &discordgo.Interaction{
 		Type: discordgo.InteractionApplicationCommand,
@@ -20,7 +23,7 @@ func TestTdCalCmdHandler(t *testing.T) {
 		},
 	}
 
-	resp := tdCalCmdHandler(inter)
+	resp := tdCalCmdHandler(ctx, inter)
 	if resp == nil {
 		t.Fatal("Expected non-nil response")
 	}
@@ -42,6 +45,8 @@ func TestTdCalCmdHandler(t *testing.T) {
 }
 
 func TestTdEventCmdHandler(t *testing.T) {
+	ctx := context.Background()
+
 	// Construct a fake interaction for an application command: /td event 1312
 	inter := &discordgo.Interaction{
 		Type: discordgo.InteractionApplicationCommand,
@@ -62,7 +67,7 @@ func TestTdEventCmdHandler(t *testing.T) {
 		},
 	}
 
-	resp := tdEventCmdHandler(inter)
+	resp := tdEventCmdHandler(ctx, inter)
 	if resp == nil {
 		t.Fatal("Expected non-nil response")
 	}
