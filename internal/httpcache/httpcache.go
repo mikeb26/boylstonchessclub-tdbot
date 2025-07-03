@@ -2,7 +2,7 @@
  *
  * See LICENSE file at the root of this repository for license terms
  */
-package internal
+package httpcache
 
 import (
 	"context"
@@ -12,17 +12,16 @@ import (
 	"time"
 
 	"github.com/gregjones/httpcache"
+	"github.com/mikeb26/boylstonchessclub-tdbot/internal"
 	"github.com/mikeb26/boylstonchessclub-tdbot/s3cache"
 )
-
-const s3Bucket = "bopmatic-boylstonchessclub-tdbot-prod-webcache"
 
 // NewCachedHttpClient returns an http.Client that caches via S3-backed httpcache.
 // If cache initialization fails, it falls back to an in-memory cache instead of no cache.
 // It also enforces a client-side TTL by rewriting origin cache headers.
 func NewCachedHttpClient(ctx context.Context, maxAge time.Duration) *http.Client {
 	// Initialize S3-backed cache
-	cache := s3cache.New(ctx, s3Bucket, false, true)
+	cache := s3cache.New(ctx, internal.WebCacheBucket, false, true)
 
 	err := cache.Init()
 

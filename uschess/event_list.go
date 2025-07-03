@@ -11,6 +11,7 @@ import (
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/mikeb26/boylstonchessclub-tdbot/internal"
+	"github.com/mikeb26/boylstonchessclub-tdbot/internal/httpcache"
 )
 
 type Event struct {
@@ -32,7 +33,7 @@ func GetAffiliateEvents(affiliateCode string) ([]Event, error) {
 	}
 	req.Header.Set("User-Agent", internal.UserAgent)
 
-	client := internal.NewCachedHttpClient(context.Background(), 24*time.Hour)
+	client := httpcache.NewCachedHttpClient(context.Background(), 24*time.Hour)
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, err

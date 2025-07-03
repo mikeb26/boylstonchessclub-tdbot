@@ -16,6 +16,7 @@ import (
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/mikeb26/boylstonchessclub-tdbot/internal"
+	"github.com/mikeb26/boylstonchessclub-tdbot/internal/httpcache"
 )
 
 // Result represents the outcome of a round.
@@ -71,7 +72,7 @@ func FetchCrossTables(id int) ([]*CrossTable, error) {
 
 	// these are rarely (if ever) updated so 1 month cache is fine for our use
 	// case
-	client := internal.NewCachedHttpClient(context.Background(), 30*24*time.Hour)
+	client := httpcache.NewCachedHttpClient(context.Background(), 30*24*time.Hour)
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("unable to fetch uscf crosstable (do): %w", err)

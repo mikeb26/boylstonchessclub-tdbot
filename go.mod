@@ -12,6 +12,7 @@ require (
 	github.com/aws/aws-sdk-go-v2 v1.36.5
 	github.com/aws/aws-sdk-go-v2/config v1.29.17
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.83.0
+	github.com/aws/smithy-go v1.22.4
 	github.com/bwmarrin/discordgo v0.0.0-00010101000000-000000000000
 	github.com/gregjones/httpcache v0.0.0-20190611155906-901d90724c79
 	golang.org/x/sync v0.15.0
@@ -33,7 +34,6 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/sso v1.25.5 // indirect
 	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.30.3 // indirect
 	github.com/aws/aws-sdk-go-v2/service/sts v1.34.0 // indirect
-	github.com/aws/smithy-go v1.22.4 // indirect
 	github.com/gorilla/websocket v1.4.2 // indirect
 	golang.org/x/crypto v0.37.0 // indirect
 	golang.org/x/net v0.39.0 // indirect

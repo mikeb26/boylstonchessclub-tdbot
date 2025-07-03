@@ -16,6 +16,7 @@ import (
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/mikeb26/boylstonchessclub-tdbot/internal"
+	"github.com/mikeb26/boylstonchessclub-tdbot/internal/httpcache"
 )
 
 // Player holds information about a USCF member.
@@ -47,7 +48,7 @@ func FetchPlayer(memberID int) (*Player, error) {
 	}
 	req.Header.Set("User-Agent", internal.UserAgent)
 
-	client := internal.NewCachedHttpClient(context.Background(), 24*time.Hour)
+	client := httpcache.NewCachedHttpClient(context.Background(), 24*time.Hour)
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("performing HTTP GET: %w", err)

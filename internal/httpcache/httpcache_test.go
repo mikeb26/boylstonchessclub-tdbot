@@ -2,7 +2,7 @@
  *
  * See LICENSE file at the root of this repository for license terms
  */
-package internal
+package httpcache
 
 import (
 	"context"
