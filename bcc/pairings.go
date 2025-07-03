@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+
+	"github.com/mikeb26/boylstonchessclub-tdbot/internal"
 )
 
 // buildPairingsOutput formats pairings into grouped, aligned string output
@@ -54,19 +56,20 @@ func BuildPairingsOutput(t *Tournament) string {
 		var rows []row
 		for _, p := range list {
 			var w, b, bl string
-			w = fmt.Sprintf("%s(%d %.1f)", p.WhitePlayer.DisplayName,
-				p.WhitePlayer.PrimaryRating, p.WhitePlayer.CurrentScore)
+			w = fmt.Sprintf("%s(%d %v)", p.WhitePlayer.DisplayName,
+				p.WhitePlayer.PrimaryRating,
+				internal.ScoreToString(p.WhitePlayer.CurrentScore))
 			if p.IsByePairing {
 				b = "n/a"
 				if p.WhitePoints != nil && *p.WhitePoints == 1.0 {
-					bl = "BYE(1.0)"
+					bl = "BYE(1)"
 				} else {
-					bl = "BYE(0.5)"
+					bl = "BYE(½)"
 				}
 			} else {
 				b = fmt.Sprintf("%d.", p.BoardNumber)
-				bl = fmt.Sprintf("%s(%d %.1f)", p.BlackPlayer.DisplayName,
-					p.BlackPlayer.PrimaryRating, p.BlackPlayer.CurrentScore)
+				bl = fmt.Sprintf("%s(%d %v)", p.BlackPlayer.DisplayName,
+					p.BlackPlayer.PrimaryRating, internal.ScoreToString(p.BlackPlayer.CurrentScore))
 			}
 			rows = append(rows, row{board: b, white: w, black: bl})
 		}

@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+
+	"github.com/mikeb26/boylstonchessclub-tdbot/internal"
 )
 
 // buildStandingsOutput formats standings into grouped, aligned string output
@@ -47,7 +49,7 @@ func BuildStandingsOutput(t *Tournament) string {
 			r := row{
 				rank:   rank,
 				player: p.DisplayName,
-				score:  fmt.Sprintf("%.1f", p.CurrentScoreAG),
+				score:  fmt.Sprintf("%v", internal.ScoreToString(p.CurrentScoreAG)),
 			}
 			rows = append(rows, r)
 		}

@@ -422,7 +422,7 @@ func BuildOneCrossTableOutput(xt *CrossTable,
 				continue
 			}
 			if filteredPlayerPairNum == e.PairNum {
-				playerName = fmt.Sprintf("++%v++", playerName)
+				playerName = fmt.Sprintf("**%v**", playerName)
 			}
 		}
 
@@ -430,7 +430,7 @@ func BuildOneCrossTableOutput(xt *CrossTable,
 			fmt.Sprintf("%d.", e.PairNum),
 			playerName,
 			fmt.Sprintf("%v->%v", e.PlayerRatingPre, e.PlayerRatingPost),
-			fmt.Sprintf("%.1f", e.TotalPoints),
+			fmt.Sprintf("%v", internal.ScoreToString(e.TotalPoints)),
 		}
 		for _, res := range e.Results {
 			var cell string
@@ -451,11 +451,11 @@ func BuildOneCrossTableOutput(xt *CrossTable,
 				cell = fmt.Sprintf("D%d", res.OpponentPairNum)
 				cell += fmt.Sprintf("(%c)", res.Color[0])
 			case ResultFullBye:
-				cell = "BYE(1.0)"
+				cell = "BYE(1)"
 			case ResultHalfBye:
-				cell = "BYE(0.5)"
+				cell = "BYE(½)"
 			case ResultUnplayedGame:
-				cell = "BYE(0.0)"
+				cell = "BYE(0)"
 			default:
 				cell = "?"
 			}
