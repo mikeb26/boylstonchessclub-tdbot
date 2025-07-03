@@ -52,11 +52,20 @@ type CrossTableEntry struct {
 	Results          []RoundResult
 }
 
+type RatingType int
+
+const (
+	RatingTypeRegular RatingType = iota
+	RatingTypeQuick
+	RatingTypeBlitz
+)
+
 // CrossTable holds the full cross table data, one per section.
 type CrossTable struct {
 	SectionName   string
 	NumRounds     int
 	NumPlayers    int
+	RType         RatingType
 	PlayerEntries []CrossTableEntry
 }
 
@@ -135,13 +144,25 @@ func FetchCrossTables(ctx context.Context, id EventID) (*Tournament, error) {
 	var endDate time.Time
 	doc.Find("td").Each(func(_ int, s *goquery.Selection) {
 		if strings.TrimSpace(s.Text()) == "Event Date(s)" {
-			raw := strings.TrimSpace(s.Next().Text())
+			// skip any empty cell, find next non-empty text cell
+			nxt := s.Next()
+			for nxt.Length() > 0 && strings.TrimSpace(nxt.Text()) == "" {
+				nxt = nxt.Next()
+			}
+			raw := strings.TrimSpace(nxt.Text())
 			parts := strings.Split(raw, "thru")
 			if len(parts) == 2 {
 				endRaw := strings.TrimSpace(parts[1])
 				dt, err := internal.ParseDateOrZero(endRaw)
 				if err != nil {
 					log.Printf("warning: unable to parse event end date %v: %v", endRaw, err)
+				} else {
+					endDate = dt
+				}
+			} else if len(parts) == 1 {
+				dt, err := internal.ParseDateOrZero(strings.TrimSpace(parts[0]))
+				if err != nil {
+					log.Printf("warning: unable to parse event end date %v: %v", parts[0], err)
 				} else {
 					endDate = dt
 				}
@@ -167,6 +188,37 @@ func parseOneCrossTable(sel *goquery.Selection, sectionName string) *CrossTable 
 	sel.Find("a, i").Each(func(_ int, s *goquery.Selection) {
 		s.ReplaceWithHtml(s.Text())
 	})
+
+	// Determine rating type for this section
+	rType := RatingTypeRegular
+	// locate section header table
+	parentTr := sel.Parent().Parent()
+	headerTr := parentTr.Prev()
+	headerTbl := headerTr.Find("table").First()
+	headerTbl.Find("td").Each(func(_ int, s *goquery.Selection) {
+		if strings.TrimSpace(s.Text()) == "Stats" {
+			// find next non-empty cell
+			nxt := s.Next()
+			for nxt.Length() > 0 && strings.TrimSpace(nxt.Text()) == "" {
+				nxt = nxt.Next()
+			}
+			txt := nxt.Text()
+			if idx := strings.Index(txt, "Rating Sys:"); idx != -1 {
+				val := strings.TrimSpace(txt[idx+len("Rating Sys:"):])
+				if len(val) > 0 {
+					switch val[0] {
+					case 'R', 'D':
+						rType = RatingTypeRegular
+					case 'B':
+						rType = RatingTypeBlitz
+					case 'Q':
+						rType = RatingTypeQuick
+					}
+				}
+			}
+		}
+	})
+
 	text := sel.Text()
 	lines := strings.Split(text, "\n")
 
@@ -206,6 +258,7 @@ func parseOneCrossTable(sel *goquery.Selection, sectionName string) *CrossTable 
 		SectionName:   sectionName,
 		NumRounds:     numRounds,
 		NumPlayers:    len(entries),
+		RType:         rType,
 		PlayerEntries: entries,
 	}
 }

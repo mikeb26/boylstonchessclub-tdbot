@@ -43,7 +43,10 @@ func TestFetchCrossTables202506242722(t *testing.T) {
 		if strings.Contains(strings.ToUpper(tourney.CrossTables[i].SectionName),
 			"OPEN") {
 			openCT = tourney.CrossTables[i]
-			break
+		}
+		if tourney.CrossTables[i].RType != RatingTypeRegular {
+			t.Fatalf("expected regular rtype, got %v",
+				tourney.CrossTables[i].RType)
 		}
 	}
 	if openCT == nil {
@@ -97,6 +100,41 @@ func TestFetchCrossTables202506242722(t *testing.T) {
 		r = entry.Results[3]
 		if r.Outcome != ResultLoss || r.OpponentPairNum != 7 || r.Color != "black" {
 			t.Errorf("round 4: expected loss to 7 with black, got %+v", r)
+		}
+	}
+}
+
+func TestFetchCrossTables202506274082(t *testing.T) {
+	ctx := context.Background()
+
+	tourney, err := FetchCrossTables(ctx, 202506274082)
+	if err != nil {
+		t.Fatalf("FetchCrossTables error: %v", err)
+	}
+
+	// verify dates and name
+	if tourney.Event.Name != "BIG MONEY BLITZ" {
+		t.Errorf("wrong name: %v", tourney.Event.Name)
+	}
+	if tourney.Event.ID != 202506274082 {
+		t.Errorf("wrong id: %v", tourney.Event.ID)
+	}
+	// verify end date
+	if tourney.Event.EndDate.Format("2006-01-02") != "2025-06-27" {
+		t.Errorf("wrong end date: %v", tourney.Event.EndDate)
+	}
+
+	// Verify number of sections
+	if tourney.NumSections != 2 {
+		t.Fatalf("expected 5 sections, got %d", tourney.NumSections)
+	}
+	if len(tourney.CrossTables) != 2 {
+		t.Fatalf("expected 5 cross tables, got %d", len(tourney.CrossTables))
+	}
+
+	for _, xt := range tourney.CrossTables {
+		if xt.RType != RatingTypeBlitz {
+			t.Fatalf("Wrong rating type: %v", xt.RType)
 		}
 	}
 }
