@@ -1,6 +1,7 @@
 package uschess
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"net/http"
@@ -31,7 +32,8 @@ func GetAffiliateEvents(affiliateCode string) ([]Event, error) {
 	}
 	req.Header.Set("User-Agent", internal.UserAgent)
 
-	resp, err := http.DefaultClient.Do(req)
+	client := internal.NewCachedHttpClient(context.Background(), 24*time.Hour)
+	resp, err := client.Do(req)
 	if err != nil {
 		return nil, err
 	}

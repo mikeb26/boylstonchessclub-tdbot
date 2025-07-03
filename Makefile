@@ -18,6 +18,7 @@ test: build FORCE
 	go test github.com/mikeb26/boylstonchessclub-tdbot/cmd/discordbot
 	go test github.com/mikeb26/boylstonchessclub-tdbot/bcc
 	go test github.com/mikeb26/boylstonchessclub-tdbot/uschess
+	go test github.com/mikeb26/boylstonchessclub-tdbot/internal
 
 .PHONY: deps
 deps:

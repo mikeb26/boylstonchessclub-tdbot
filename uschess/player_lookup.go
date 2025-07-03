@@ -5,6 +5,7 @@
 package uschess
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net/http"
@@ -46,7 +47,7 @@ func FetchPlayer(memberID int) (*Player, error) {
 	}
 	req.Header.Set("User-Agent", internal.UserAgent)
 
-	client := &http.Client{}
+	client := internal.NewCachedHttpClient(context.Background(), 24*time.Hour)
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("performing HTTP GET: %w", err)

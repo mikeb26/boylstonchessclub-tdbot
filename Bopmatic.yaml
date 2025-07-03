@@ -12,3 +12,7 @@ project:
     executable: "discordbot"
     user_access: "anon_public"
   buildcmd: "make"
+  object_stores:
+  - name: "webcache"
+    desc: "Web cache to mitigate high latency responses from uschess.org"
+    services_access: [ "DiscordBot" ]
