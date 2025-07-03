@@ -65,7 +65,7 @@ func tdAboutCmdHandler(inter *discordgo.Interaction) *discordgo.InteractionRespo
 		},
 	}
 
-	resp.Data.Content = aboutText
+	resp.Data.Content = truncateContent(aboutText)
 
 	return resp
 }
@@ -81,7 +81,7 @@ func tdHelpCmdHandler(inter *discordgo.Interaction) *discordgo.InteractionRespon
 		},
 	}
 
-	resp.Data.Content = helpText
+	resp.Data.Content = truncateContent(helpText)
 	return resp
 }
 
@@ -153,7 +153,7 @@ func tdCalCmdHandler(inter *discordgo.Interaction) *discordgo.InteractionRespons
 		}
 	}
 	sb.WriteString("\nRun /td event <EventID> to get details on a specific event\n")
-	resp.Data.Content = sb.String()
+	resp.Data.Content = truncateContent(sb.String())
 
 	if broadcast {
 		resp.Data.Flags = 0
@@ -284,7 +284,7 @@ func tdPairingsCmdHandler(inter *discordgo.Interaction) *discordgo.InteractionRe
 	}
 	// Wrap output in code block for monospace formatting in Discord
 	resp.Data.Content = fmt.Sprintf("```\n%s```",
-		bcc.BuildPairingsOutput(tourney))
+		truncateContent(bcc.BuildPairingsOutput(tourney)))
 
 	if broadcast {
 		resp.Data.Flags = 0
@@ -335,7 +335,8 @@ func tdStandingsCmdHandler(inter *discordgo.Interaction) *discordgo.InteractionR
 
 	// Wrap output in code block for monospace formatting in Discord
 	resp.Data.Content =
-		fmt.Sprintf("```\n%s```", bcc.BuildStandingsOutput(tourney))
+		fmt.Sprintf("```\n%s```",
+			truncateContent(bcc.BuildStandingsOutput(tourney)))
 
 	if broadcast {
 		resp.Data.Flags = 0
@@ -386,11 +387,22 @@ func tdPlayerCmdHandler(inter *discordgo.Interaction) *discordgo.InteractionResp
 	}
 
 	// Wrap output in code block for monospace formatting in Discord
-	resp.Data.Content = fmt.Sprintf("```\n%s```", report)
+	resp.Data.Content = fmt.Sprintf("```\n%s```", truncateContent(report))
 
 	if broadcast {
 		resp.Data.Flags = 0
 	}
 
 	return resp
+}
+
+// https://discord.com/developers/docs/resources/channel#start-thread-in-forum-or-media-channel-forum-and-media-thread-message-params-object
+// limits messages to 2k characters
+func truncateContent(s string) string {
+	const MsgLimit = 1988 // keep space for newlines and markdown
+	runes := []rune(s)
+	if len(runes) > MsgLimit {
+		s = fmt.Sprintf("%v...", string(runes[:MsgLimit]))
+	}
+	return s
 }
