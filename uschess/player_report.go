@@ -102,13 +102,13 @@ func fetchRecentPlayerCrossTables(ctx context.Context, player *Player,
 		}
 		count++
 		g.Go(func() error {
-			sections, err := FetchCrossTables(ctx, ev.ID)
+			t, err := FetchCrossTables(ctx, ev.ID)
 			if err != nil {
 				return fmt.Errorf("error fetching cross tables for event %v: %w",
 					ev.ID, err)
 			}
 			var xts []CrossTable
-			for _, section := range sections {
+			for _, section := range t.CrossTables {
 				for _, entry := range section.PlayerEntries {
 					if entry.PlayerId == player.MemberID {
 						xts = append(xts, *section)

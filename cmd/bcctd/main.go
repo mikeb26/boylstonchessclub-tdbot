@@ -215,13 +215,13 @@ func handleCrossTable(ctx context.Context, args []string) {
 		os.Exit(1)
 	}
 
-	xTables, err := uschess.FetchCrossTables(ctx, uschess.EventID(*tid))
+	t, err := uschess.FetchCrossTables(ctx, uschess.EventID(*tid))
 	if err != nil {
 		log.Fatalf("Error fetching cross tables %d: %v", *tid, err)
 	}
 
-	for _, xt := range xTables {
-		output := uschess.BuildOneCrossTableOutput(xt, len(xTables) > 1, 0)
+	for _, xt := range t.CrossTables {
+		output := uschess.BuildOneCrossTableOutput(xt, len(t.CrossTables) > 1, 0)
 		fmt.Printf(output)
 	}
 }

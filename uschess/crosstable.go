@@ -60,8 +60,16 @@ type CrossTable struct {
 	PlayerEntries []CrossTableEntry
 }
 
-// FetchCrossTable retrieves all sections' cross tables from the given id.
-func FetchCrossTables(ctx context.Context, id EventID) ([]*CrossTable, error) {
+// Tournament encapsulates the overall event and its cross tables.
+type Tournament struct {
+	Event       Event
+	NumSections int
+
+	CrossTables []*CrossTable
+}
+
+// FetchCrossTables retrieves a Tournament with all sections' cross tables for the given event id.
+func FetchCrossTables(ctx context.Context, id EventID) (*Tournament, error) {
 	url := fmt.Sprintf("https://www.uschess.org/msa/XtblMain.php?%v.0", id)
 
 	req, err := http.NewRequest("GET", url, nil)
@@ -112,7 +120,46 @@ func FetchCrossTables(ctx context.Context, id EventID) ([]*CrossTable, error) {
 		cts = append(cts, ct)
 	}
 
-	return cts, nil
+	// Build Tournament object
+	rawTitle := strings.TrimSpace(doc.Find("title").First().Text())
+	// Extract event name between "Cross Table for " and "(Event"
+	eventName := rawTitle
+	prefix := "Cross Table for "
+	if idx := strings.Index(rawTitle, prefix); idx != -1 {
+		if idxEvent := strings.LastIndex(rawTitle, "(Event"); idxEvent != -1 && idxEvent > idx {
+			eventName = strings.TrimSpace(rawTitle[idx+len(prefix) : idxEvent])
+		}
+	}
+
+	// Extract event end date from summary
+	var endDate time.Time
+	doc.Find("td").Each(func(_ int, s *goquery.Selection) {
+		if strings.TrimSpace(s.Text()) == "Event Date(s)" {
+			raw := strings.TrimSpace(s.Next().Text())
+			parts := strings.Split(raw, "thru")
+			if len(parts) == 2 {
+				endRaw := strings.TrimSpace(parts[1])
+				dt, err := internal.ParseDateOrZero(endRaw)
+				if err != nil {
+					log.Printf("warning: unable to parse event end date %v: %v", endRaw, err)
+				} else {
+					endDate = dt
+				}
+			}
+		}
+	})
+
+	t := &Tournament{
+		Event: Event{
+			EndDate: endDate,
+			Name:    eventName,
+			ID:      id,
+		},
+		NumSections: len(cts),
+		CrossTables: cts,
+	}
+
+	return t, nil
 }
 
 func parseOneCrossTable(sel *goquery.Selection, sectionName string) *CrossTable {

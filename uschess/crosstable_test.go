@@ -13,24 +13,42 @@ import (
 func TestFetchCrossTables202506242722(t *testing.T) {
 	ctx := context.Background()
 
-	cts, err := FetchCrossTables(ctx, 202506242722)
+	tourney, err := FetchCrossTables(ctx, 202506242722)
 	if err != nil {
 		t.Fatalf("FetchCrossTables error: %v", err)
 	}
+
+	// verify dates and name
+	if tourney.Event.Name != "JUNE TUESDAY NIGHT SWISS (OTB)" {
+		t.Errorf("wrong name: %v", tourney.Event.Name)
+	}
+	if tourney.Event.ID != 202506242722 {
+		t.Errorf("wrong id: %v", tourney.Event.ID)
+	}
+	// verify end date
+	if tourney.Event.EndDate.Format("2006-01-02") != "2025-06-24" {
+		t.Errorf("wrong end date: %v", tourney.Event.EndDate)
+	}
+
 	// Verify number of sections
-	if len(cts) != 5 {
-		t.Fatalf("expected 5 sections, got %d", len(cts))
+	if tourney.NumSections != 5 {
+		t.Fatalf("expected 5 sections, got %d", tourney.NumSections)
+	}
+	if len(tourney.CrossTables) != 5 {
+		t.Fatalf("expected 5 cross tables, got %d", len(tourney.CrossTables))
 	}
 	// Locate OPEN section
 	var openCT *CrossTable
-	for i := range cts {
-		if strings.Contains(strings.ToUpper(cts[i].SectionName), "OPEN") {
-			openCT = cts[i]
+	for i := range tourney.CrossTables {
+		if strings.Contains(strings.ToUpper(tourney.CrossTables[i].SectionName),
+			"OPEN") {
+			openCT = tourney.CrossTables[i]
 			break
 		}
 	}
 	if openCT == nil {
-		t.Fatalf("OPEN section not found among sections: %+v", cts)
+		t.Fatalf("OPEN section not found among sections: %+v",
+			tourney.CrossTables)
 	}
 	// Locate Rufus' entry
 	var entry *CrossTableEntry
