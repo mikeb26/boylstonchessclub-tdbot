@@ -24,18 +24,21 @@ func GetPlayerReport(ctx context.Context, memberID MemID,
 		return "", err
 	}
 
-	xTables, err := fetchRecentPlayerCrossTables(ctx, player, eventCount)
+	const extraEvents = 2 // in case we filter out any blitz
+	xTables, err := fetchRecentPlayerCrossTables(ctx, player,
+		eventCount+extraEvents)
 	if err != nil {
 		return "", err
 	}
 
-	output := buildPlayerReport(player, xTables)
+	output := buildPlayerReport(player, xTables, eventCount)
 
 	return output, nil
 }
 
 func buildPlayerReport(player *Player,
-	xTables map[EventID][]CrossTable) string {
+	xTables map[EventID][]CrossTable,
+	eventCount int) string {
 
 	var sb strings.Builder
 
@@ -46,8 +49,8 @@ func buildPlayerReport(player *Player,
 	sb.WriteString(fmt.Sprintf("Live Rating(blitz): %v\n", player.BlitzRating))
 	sb.WriteString(fmt.Sprintf("Rated Events: %v\n", player.TotalEvents))
 	if len(xTables) > 0 {
-		sb.WriteString(fmt.Sprintf("Most Recent(%v) Results:\n\n",
-			len(xTables)))
+		sb.WriteString(fmt.Sprintf("Most Recent(%v) Classical Events:\n\n",
+			eventCount))
 	}
 
 	// Sort events by date
@@ -61,16 +64,27 @@ func buildPlayerReport(player *Player,
 		return evI.EndDate.After(evJ.EndDate)
 	})
 
+	outputCount := 0
 	for _, eventId := range eventIDs {
+		if outputCount >= eventCount {
+			break
+		}
 		event := getEventFromId(player.RecentEvents, eventId)
 
-		sb.WriteString(fmt.Sprintf("%v - %v\n",
-			event.EndDate.Format("2006-01-02"), event.Name))
-
+		firstTableInEvent := true
 		// a player can have multiple cross tables from a single event
 		// if they play in multiple sections. e.g. the player switched
 		// sections during an event, or a td created a side games section
 		for _, xt := range xTables[eventId] {
+			if xt.RType != RatingTypeRegular {
+				continue
+			}
+			if firstTableInEvent {
+				sb.WriteString(fmt.Sprintf("%v - %v\n",
+					event.EndDate.Format("2006-01-02"), event.Name))
+				outputCount++
+				firstTableInEvent = false
+			}
 			output := BuildOneCrossTableOutput(&xt, true, player.MemberID)
 			sb.WriteString(output)
 		}
