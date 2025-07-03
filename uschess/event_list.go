@@ -92,13 +92,3 @@ func GetAffiliateEvents(affiliateCode string) ([]Event, error) {
 
 	return events, nil
 }
-
-func main() {
-	events, err := GetAffiliateEvents("A5000408")
-	if err != nil {
-		log.Fatal(err)
-	}
-	for _, e := range events {
-		fmt.Printf("%s\t%s\t%v\n", e.EndDate, e.Name, e.ID)
-	}
-}

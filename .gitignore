@@ -1,5 +1,6 @@
 /.bopmatic
 /discordbot
 /bcctd
+/cacheseed
 /vendor
 /cmd/discordbot/token.priv

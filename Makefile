@@ -2,7 +2,7 @@ export GO111MODULE=on
 export GOFLAGS=-mod=vendor
 
 .PHONY: build
-build: discordbot bcctd
+build: discordbot bcctd cacheseed
 
 vendor: go.mod
 	go mod download
@@ -13,6 +13,9 @@ discordbot: vendor FORCE
 
 bcctd: vendor FORCE
 	go build github.com/mikeb26/boylstonchessclub-tdbot/cmd/bcctd
+
+cacheseed: vendor FORCE
+	go build github.com/mikeb26/boylstonchessclub-tdbot/cmd/cacheseed
 
 test: build FORCE
 	go test github.com/mikeb26/boylstonchessclub-tdbot/cmd/discordbot
@@ -30,6 +33,6 @@ deps:
 
 .PHONY: clean
 clean:
-	rm -rf discordbot bcctd
+	rm -rf discordbot bcctd cacheseed
 
 FORCE:
