@@ -395,7 +395,8 @@ func tdPlayerCmdHandler(ctx context.Context,
 		return resp
 	}
 
-	report, err := uschess.GetPlayerReport(ctx, int(memID), 3 /* eventCount */)
+	report, err := uschess.GetPlayerReport(ctx, uschess.MemID(memID),
+		3 /* eventCount */)
 	if err != nil {
 		resp.Data.Content = fmt.Sprintf("Error fetching player %v report: %v",
 			memID, err)

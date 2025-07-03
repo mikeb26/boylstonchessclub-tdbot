@@ -45,7 +45,7 @@ type RoundResult struct {
 type CrossTableEntry struct {
 	PairNum          int
 	PlayerName       string
-	PlayerId         int
+	PlayerId         MemID
 	PlayerRatingPre  string
 	PlayerRatingPost string
 	TotalPoints      float64
@@ -61,7 +61,7 @@ type CrossTable struct {
 }
 
 // FetchCrossTable retrieves all sections' cross tables from the given id.
-func FetchCrossTables(ctx context.Context, id int) ([]*CrossTable, error) {
+func FetchCrossTables(ctx context.Context, id EventID) ([]*CrossTable, error) {
 	url := fmt.Sprintf("https://www.uschess.org/msa/XtblMain.php?%v.0", id)
 
 	req, err := http.NewRequest("GET", url, nil)
@@ -262,7 +262,7 @@ func parseCrossTableEntries(start, numCols int,
 		entries = append(entries, CrossTableEntry{
 			PairNum:          pairNum,
 			PlayerName:       normalizeName(name),
-			PlayerId:         playerID,
+			PlayerId:         MemID(playerID),
 			PlayerRatingPre:  preRating,
 			PlayerRatingPost: postRating,
 			TotalPoints:      totalPts,
@@ -274,7 +274,7 @@ func parseCrossTableEntries(start, numCols int,
 }
 
 func BuildOneCrossTableOutput(xt *CrossTable,
-	includeSectionHeader bool, filterPlayerID int) string {
+	includeSectionHeader bool, filterPlayerID MemID) string {
 
 	// If filtering, determine which pair numbers to include (player + opponents)
 	var includeSet map[int]bool

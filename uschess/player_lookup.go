@@ -19,9 +19,11 @@ import (
 	"github.com/mikeb26/boylstonchessclub-tdbot/internal/httpcache"
 )
 
+type MemID int
+
 // Player holds information about a USCF member.
 type Player struct {
-	MemberID    int
+	MemberID    MemID
 	Name        string
 	RegRating   string
 	QuickRating string
@@ -39,7 +41,7 @@ type Player struct {
 // latency (>2s). I also considered
 // https://new.uschess.org/civicrm/player-search but this seems like it would
 // have required a headless browser to utilize.
-func FetchPlayer(ctx context.Context, memberID int) (*Player, error) {
+func FetchPlayer(ctx context.Context, memberID MemID) (*Player, error) {
 	endpoint := fmt.Sprintf("https://www.uschess.org/msa/MbrDtlTnmtHst.php?%v", memberID)
 
 	req, err := http.NewRequest("GET", endpoint, nil)
@@ -64,7 +66,7 @@ func FetchPlayer(ctx context.Context, memberID int) (*Player, error) {
 }
 
 // parsePlayerName finds the player's name in a bold tag: "<b>memberID: NAME</b>".
-func parsePlayerName(memberID int, doc *goquery.Document) string {
+func parsePlayerName(memberID MemID, doc *goquery.Document) string {
 	name := ""
 	doc.Find("b").EachWithBreak(func(i int, s *goquery.Selection) bool {
 		text := strings.TrimSpace(s.Text())
@@ -100,7 +102,7 @@ func parseTotalEvents(player *Player, doc *goquery.Document) {
 }
 
 // parsePlayer parses HTML and extracts the player's name, current ratings, and event history.
-func parsePlayer(memberID int, body io.ReadCloser) (*Player, error) {
+func parsePlayer(memberID MemID, body io.ReadCloser) (*Player, error) {
 	doc, err := goquery.NewDocumentFromReader(body)
 	if err != nil {
 		return nil, fmt.Errorf("parsing HTML: %w", err)
@@ -189,7 +191,7 @@ func parseTournamentHistory(player *Player, doc *goquery.Document) error {
 		events = append(events, Event{
 			EndDate: endDate,
 			Name:    name,
-			ID:      id,
+			ID:      EventID(id),
 		})
 	})
 

@@ -16,7 +16,7 @@ import (
 
 // Retrieve player information including crosstables from the specified number
 // of most recent events. Return the result in string form.
-func GetPlayerReport(ctx context.Context, memberID int,
+func GetPlayerReport(ctx context.Context, memberID MemID,
 	eventCount int) (string, error) {
 
 	player, err := FetchPlayer(ctx, memberID)
@@ -35,7 +35,7 @@ func GetPlayerReport(ctx context.Context, memberID int,
 }
 
 func buildPlayerReport(player *Player,
-	xTables map[int][]CrossTable) string {
+	xTables map[EventID][]CrossTable) string {
 
 	var sb strings.Builder
 
@@ -51,7 +51,7 @@ func buildPlayerReport(player *Player,
 	}
 
 	// Sort events by date
-	var eventIDs []int
+	var eventIDs []EventID
 	for id := range xTables {
 		eventIDs = append(eventIDs, id)
 	}
@@ -79,7 +79,7 @@ func buildPlayerReport(player *Player,
 	return sb.String()
 }
 
-func getEventFromId(events []Event, eventId int) Event {
+func getEventFromId(events []Event, eventId EventID) Event {
 	for _, event := range events {
 		if event.ID == eventId {
 			return event
@@ -90,9 +90,9 @@ func getEventFromId(events []Event, eventId int) Event {
 }
 
 func fetchRecentPlayerCrossTables(ctx context.Context, player *Player,
-	eventCount int) (map[int][]CrossTable, error) {
+	eventCount int) (map[EventID][]CrossTable, error) {
 
-	xTables := make(map[int][]CrossTable)
+	xTables := make(map[EventID][]CrossTable)
 	var mu sync.Mutex
 	g, _ := errgroup.WithContext(ctx)
 	count := 0

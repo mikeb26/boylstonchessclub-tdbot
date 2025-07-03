@@ -14,10 +14,12 @@ import (
 	"github.com/mikeb26/boylstonchessclub-tdbot/internal/httpcache"
 )
 
+type EventID int
+
 type Event struct {
 	EndDate time.Time
 	Name    string
-	ID      int
+	ID      EventID
 }
 
 // GetAffiliateEvents fetches and parses the Affiliate Tournament History page
@@ -87,7 +89,7 @@ func GetAffiliateEvents(ctx context.Context, affiliateCode string) ([]Event, err
 		events = append(events, Event{
 			EndDate: endDate,
 			Name:    name,
-			ID:      idInt,
+			ID:      EventID(idInt),
 		})
 	})
 

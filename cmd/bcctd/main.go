@@ -215,7 +215,7 @@ func handleCrossTable(ctx context.Context, args []string) {
 		os.Exit(1)
 	}
 
-	xTables, err := uschess.FetchCrossTables(ctx, *tid)
+	xTables, err := uschess.FetchCrossTables(ctx, uschess.EventID(*tid))
 	if err != nil {
 		log.Fatalf("Error fetching cross tables %d: %v", *tid, err)
 	}
@@ -308,7 +308,8 @@ func handlePlayer(ctx context.Context, args []string) {
 		*eventCount = 5
 	}
 
-	report, err := uschess.GetPlayerReport(ctx, *memberID, *eventCount)
+	report, err := uschess.GetPlayerReport(ctx, uschess.MemID(*memberID),
+		*eventCount)
 	if err != nil {
 		log.Fatalf("Error fetching player %v: %v", memberID, err)
 	}
