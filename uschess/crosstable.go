@@ -16,7 +16,6 @@ import (
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/mikeb26/boylstonchessclub-tdbot/internal"
-	"github.com/mikeb26/boylstonchessclub-tdbot/internal/httpcache"
 )
 
 // Result represents the outcome of a round.
@@ -78,7 +77,9 @@ type Tournament struct {
 }
 
 // FetchCrossTables retrieves a Tournament with all sections' cross tables for the given event id.
-func FetchCrossTables(ctx context.Context, id EventID) (*Tournament, error) {
+func (client *Client) FetchCrossTables(ctx context.Context,
+	id EventID) (*Tournament, error) {
+
 	url := fmt.Sprintf("https://www.uschess.org/msa/XtblMain.php?%v.0", id)
 
 	req, err := http.NewRequest("GET", url, nil)
@@ -89,8 +90,7 @@ func FetchCrossTables(ctx context.Context, id EventID) (*Tournament, error) {
 
 	// these are rarely (if ever) updated so 1 month cache is fine for our use
 	// case
-	client := httpcache.NewCachedHttpClient(ctx, 30*24*time.Hour)
-	resp, err := client.Do(req)
+	resp, err := client.httpClient30day.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("unable to fetch uscf crosstable (do): %w", err)
 	}

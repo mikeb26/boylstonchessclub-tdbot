@@ -16,12 +16,15 @@ import (
 )
 
 // this program exists just to seed the http cache for bcc members
+var uschessClient *uschess.Client
 
 func main() {
 	ctx := context.Background()
 
+	uschessClient = uschess.NewClient(context.Background())
+
 	for _, memId := range bcc.ActivePlayerMemIds() {
-		player, err := uschess.FetchPlayer(ctx, memId)
+		player, err := uschessClient.FetchPlayer(ctx, memId)
 		time.Sleep(2 * time.Second) // avoid pegging uschess.org
 		if err != nil {
 			// best effort
@@ -32,7 +35,7 @@ func main() {
 	}
 
 	for _, tid := range bcc.ActivePlayerTIds() {
-		_, err := uschess.FetchCrossTables(ctx, tid)
+		_, err := uschessClient.FetchCrossTables(ctx, tid)
 		time.Sleep(2 * time.Second) // avoid pegging uschess.org
 		if err != nil {
 			// best effort
@@ -42,13 +45,14 @@ func main() {
 		fmt.Printf("seeded tid:%v\n", tid)
 	}
 
-	events, err := uschess.GetAffiliateEvents(ctx, internal.BccUSCFAffiliateID)
+	events, err := uschessClient.GetAffiliateEvents(ctx,
+		internal.BccUSCFAffiliateID)
 	if err != nil {
 		// best effort
 		return
 	}
 	for _, event := range events {
-		_, err := uschess.FetchCrossTables(ctx, event.ID)
+		_, err := uschessClient.FetchCrossTables(ctx, event.ID)
 		time.Sleep(2 * time.Second) // avoid pegging uschess.org
 		if err != nil {
 			// best effort

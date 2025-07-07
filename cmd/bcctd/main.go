@@ -37,8 +37,12 @@ var commands = map[string]cmdHandler{
 	"player":     handlePlayer,
 }
 
+var uschessClient *uschess.Client
+
 func main() {
 	ctx := context.Background()
+
+	uschessClient = uschess.NewClient(ctx)
 
 	if len(os.Args) < 2 {
 		usage()
@@ -215,7 +219,7 @@ func handleCrossTable(ctx context.Context, args []string) {
 		os.Exit(1)
 	}
 
-	t, err := uschess.FetchCrossTables(ctx, uschess.EventID(*tid))
+	t, err := uschessClient.FetchCrossTables(ctx, uschess.EventID(*tid))
 	if err != nil {
 		log.Fatalf("Error fetching cross tables %d: %v", *tid, err)
 	}
@@ -249,7 +253,7 @@ func handleHistory(ctx context.Context, args []string) {
 	now := time.Now()
 	end := now.AddDate(0, 0, -*days)
 
-	events, err := uschess.GetAffiliateEvents(ctx, *aid)
+	events, err := uschessClient.GetAffiliateEvents(ctx, *aid)
 	if err != nil {
 		log.Fatalf("Error fetching events for aid:%v: %v", *aid, err)
 	}
@@ -308,7 +312,7 @@ func handlePlayer(ctx context.Context, args []string) {
 		*eventCount = 5
 	}
 
-	report, err := uschess.GetPlayerReport(ctx, uschess.MemID(*memberID),
+	report, err := uschessClient.GetPlayerReport(ctx, uschess.MemID(*memberID),
 		*eventCount)
 	if err != nil {
 		log.Fatalf("Error fetching player %v: %v", memberID, err)

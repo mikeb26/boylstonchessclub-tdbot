@@ -10,10 +10,16 @@ import (
 	"testing"
 )
 
+var testClient *Client
+
+func init() {
+	testClient = NewClient(context.Background())
+}
+
 func TestFetchCrossTables202506242722(t *testing.T) {
 	ctx := context.Background()
 
-	tourney, err := FetchCrossTables(ctx, 202506242722)
+	tourney, err := testClient.FetchCrossTables(ctx, 202506242722)
 	if err != nil {
 		t.Fatalf("FetchCrossTables error: %v", err)
 	}
@@ -107,7 +113,7 @@ func TestFetchCrossTables202506242722(t *testing.T) {
 func TestFetchCrossTables202506274082(t *testing.T) {
 	ctx := context.Background()
 
-	tourney, err := FetchCrossTables(ctx, 202506274082)
+	tourney, err := testClient.FetchCrossTables(ctx, 202506274082)
 	if err != nil {
 		t.Fatalf("FetchCrossTables error: %v", err)
 	}

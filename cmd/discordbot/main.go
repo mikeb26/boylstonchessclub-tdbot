@@ -17,6 +17,7 @@ import (
 	"strings"
 
 	"github.com/bwmarrin/discordgo"
+	"github.com/mikeb26/boylstonchessclub-tdbot/uschess"
 
 	_ "embed"
 )
@@ -288,9 +289,12 @@ func registerSlashCommands() {
 	}
 }
 
+var uschessClient *uschess.Client
+
 func main() {
 	go registerSlashCommands()
 
+	uschessClient = uschess.NewClient(context.Background())
 	hostname, err := os.Hostname()
 	if err != nil {
 		hostname = "localhost"

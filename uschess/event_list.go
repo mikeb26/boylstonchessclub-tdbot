@@ -11,7 +11,6 @@ import (
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/mikeb26/boylstonchessclub-tdbot/internal"
-	"github.com/mikeb26/boylstonchessclub-tdbot/internal/httpcache"
 )
 
 type EventID int
@@ -24,7 +23,8 @@ type Event struct {
 
 // GetAffiliateEvents fetches and parses the Affiliate Tournament History page
 // for the given affiliate code and returns a slice of Event.
-func GetAffiliateEvents(ctx context.Context, affiliateCode string) ([]Event, error) {
+func (client *Client) GetAffiliateEvents(ctx context.Context,
+	affiliateCode string) ([]Event, error) {
 
 	url := fmt.Sprintf("https://www.uschess.org/msa/AffDtlTnmtHst.php?%s",
 		affiliateCode)
@@ -35,8 +35,7 @@ func GetAffiliateEvents(ctx context.Context, affiliateCode string) ([]Event, err
 	}
 	req.Header.Set("User-Agent", internal.UserAgent)
 
-	client := httpcache.NewCachedHttpClient(ctx, 24*time.Hour)
-	resp, err := client.Do(req)
+	resp, err := client.httpClient1day.Do(req)
 	if err != nil {
 		return nil, err
 	}

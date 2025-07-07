@@ -18,7 +18,7 @@ func TestFetchPlayer(t *testing.T) {
 	const expectedName = "Michael Brown"
 	const expectedMinEventCount = 48
 
-	player, err := FetchPlayer(ctx, memberID)
+	player, err := testClient.FetchPlayer(ctx, memberID)
 	if err != nil {
 		t.Fatalf("FetchPlayer(%q) returned error: %v", memberID, err)
 	}
