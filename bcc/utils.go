@@ -6,9 +6,30 @@ package bcc
 
 import (
 	"fmt"
+	"net/http"
 	"strconv"
 	"strings"
+
+	"github.com/PuerkitoBio/goquery"
+	"github.com/mikeb26/boylstonchessclub-tdbot/internal"
 )
+
+type Source int
+
+const (
+	SourceAPI Source = iota
+	SourceWebsite
+)
+
+func (s Source) String() string {
+	if s == SourceAPI {
+		return "api"
+	} else if s == SourceWebsite {
+		return "website"
+	} else {
+		return "?"
+	}
+}
 
 // Construct an artificial Tournament from an EventDetail
 func eventDetailToTournament(eventDetail EventDetail) (*Tournament, error) {
@@ -93,4 +114,25 @@ func (s SectionSorter) Less(i, j int) bool {
 	}
 	// Fallback lexicographical
 	return a < b
+}
+
+// fetchDoc gets the HTML document at the given URL using the configured User-Agent.
+func fetchDoc(url string) (*goquery.Document, error) {
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("User-Agent", internal.UserAgent)
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("status %d fetching %s", resp.StatusCode, url)
+	}
+
+	return goquery.NewDocumentFromReader(resp.Body)
 }

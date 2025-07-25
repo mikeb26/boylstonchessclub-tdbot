@@ -35,14 +35,14 @@ func main() {
 	}
 
 	for _, tid := range bcc.ActivePlayerTIds() {
-		_, err := uschessClient.FetchCrossTables(ctx, tid)
+		tourney, err := uschessClient.FetchCrossTables(ctx, tid)
 		time.Sleep(2 * time.Second) // avoid pegging uschess.org
 		if err != nil {
 			// best effort
 			continue
 		}
 
-		fmt.Printf("seeded tid:%v\n", tid)
+		fmt.Printf("seeded ev:%v\n", tourney.Event.Name)
 	}
 
 	events, err := uschessClient.GetAffiliateEvents(ctx,

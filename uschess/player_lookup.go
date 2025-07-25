@@ -73,7 +73,7 @@ func parsePlayerName(memberID MemID, doc *goquery.Document) string {
 		prefix := fmt.Sprintf("%v:", memberID)
 		if strings.HasPrefix(text, prefix) {
 			name = strings.TrimSpace(strings.TrimPrefix(text, prefix))
-			name = normalizeName(name)
+			name = internal.NormalizeName(name)
 			return false // stop iteration
 		}
 		return true // continue

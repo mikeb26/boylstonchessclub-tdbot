@@ -36,8 +36,8 @@ func BuildPairingsOutput(t *Tournament) string {
 				t.CurrentPairings[0].RoundNumber,
 				t.CurrentPairings[0].RoundNumber))
 		} else {
-			sb.WriteString(fmt.Sprintf("Posted Round %v Pairings:\n\n",
-				t.CurrentPairings[0].RoundNumber))
+			sb.WriteString(fmt.Sprintf("Posted Round %v Pairings (via %v):\n\n",
+				t.CurrentPairings[0].RoundNumber, t.source.String()))
 		}
 	} else {
 		sb.WriteString("No pairings posted nor predicted")
@@ -55,9 +55,17 @@ func BuildPairingsOutput(t *Tournament) string {
 		type row struct{ board, white, black string }
 		var rows []row
 		for _, p := range list {
+			wRating := "unrated"
+			if p.WhitePlayer.PrimaryRating != 0 {
+				wRating = fmt.Sprintf("%v", p.WhitePlayer.PrimaryRating)
+			}
+			bRating := "unrated"
+			if p.BlackPlayer.PrimaryRating != 0 {
+				bRating = fmt.Sprintf("%v", p.BlackPlayer.PrimaryRating)
+			}
 			var w, b, bl string
-			w = fmt.Sprintf("%s(%d %v)", p.WhitePlayer.DisplayName,
-				p.WhitePlayer.PrimaryRating,
+			w = fmt.Sprintf("%s(%v %v)", p.WhitePlayer.DisplayName,
+				wRating,
 				internal.ScoreToString(p.WhitePlayer.CurrentScore))
 			if p.IsByePairing {
 				b = "n/a"
@@ -68,8 +76,8 @@ func BuildPairingsOutput(t *Tournament) string {
 				}
 			} else {
 				b = fmt.Sprintf("%d.", p.BoardNumber)
-				bl = fmt.Sprintf("%s(%d %v)", p.BlackPlayer.DisplayName,
-					p.BlackPlayer.PrimaryRating, internal.ScoreToString(p.BlackPlayer.CurrentScore))
+				bl = fmt.Sprintf("%s(%v %v)", p.BlackPlayer.DisplayName,
+					bRating, internal.ScoreToString(p.BlackPlayer.CurrentScore))
 			}
 			rows = append(rows, row{board: b, white: w, black: bl})
 		}

@@ -27,8 +27,8 @@ func BuildStandingsOutput(t *Tournament) string {
 	sort.Sort(SectionSorter(sectionNames))
 	var sb strings.Builder
 
-	sb.WriteString(fmt.Sprintf("Standings prior to Round %v:\n\n",
-		t.CurrentPairings[0].RoundNumber))
+	sb.WriteString(fmt.Sprintf("Standings prior to Round %v (via %v):\n\n",
+		t.CurrentPairings[0].RoundNumber, t.source.String()))
 
 	for sec, players := range secPlayers {
 		sort.Slice(players, func(i, j int) bool {
@@ -87,14 +87,14 @@ func BuildStandingsOutput(t *Tournament) string {
 	return sb.String()
 }
 
-func getPlayersBySection(t *Tournament) map[string][]Player {
-	secPlayers := make(map[string][]Player)
-	for _, pairing := range t.CurrentPairings {
+func getPlayersBySection(t *Tournament) map[string][]*Player {
+	secPlayers := make(map[string][]*Player)
+	for idx, pairing := range t.CurrentPairings {
 		secPlayers[pairing.Section] = append(secPlayers[pairing.Section],
-			pairing.WhitePlayer)
+			&t.CurrentPairings[idx].WhitePlayer)
 		if !pairing.IsByePairing {
 			secPlayers[pairing.Section] = append(secPlayers[pairing.Section],
-				pairing.BlackPlayer)
+				&t.CurrentPairings[idx].BlackPlayer)
 		}
 	}
 

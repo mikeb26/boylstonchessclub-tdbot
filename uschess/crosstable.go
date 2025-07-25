@@ -361,7 +361,7 @@ func parseCrossTableEntries(start, numCols int,
 
 		entries = append(entries, CrossTableEntry{
 			PairNum:          pairNum,
-			PlayerName:       normalizeName(name),
+			PlayerName:       internal.NormalizeName(name),
 			PlayerId:         MemID(playerID),
 			PlayerRatingPre:  preRating,
 			PlayerRatingPost: postRating,
