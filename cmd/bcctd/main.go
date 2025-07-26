@@ -102,7 +102,6 @@ func handleCal(ctx context.Context, args []string) {
 		// truncate event date to local date for inclusive comparison
 		evDate := time.Date(ev.Date.Year(), ev.Date.Month(), ev.Date.Day(), 0, 0, 0, 0, now.Location())
 		if evDate.Before(start) || evDate.After(end) {
-			fmt.Printf("Skipping %v\n", ev)
 			continue
 		}
 		key := ev.Date.Format("2006-01-02")
