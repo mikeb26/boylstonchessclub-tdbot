@@ -80,14 +80,16 @@ func handleCal(ctx context.Context, args []string) {
 	}
 
 	var start time.Time
-	now := time.Now()
-	end := now.AddDate(0, 0, *days)
 
-	if now.After(end) {
+	now := time.Now()
+	nowDate := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+	end := nowDate.AddDate(0, 0, *days)
+
+	if nowDate.After(end) {
 		start = end
-		end = now
+		end = nowDate
 	} else {
-		start = now
+		start = nowDate
 	}
 	// Fetch events from BCC API
 	events, err := bcc.GetEvents()
@@ -97,7 +99,10 @@ func handleCal(ctx context.Context, args []string) {
 	// Filter and group events by date
 	eventsByDate := make(map[string][]bcc.Event)
 	for _, ev := range events {
-		if ev.Date.Before(start) || ev.Date.After(end) {
+		// truncate event date to local date for inclusive comparison
+		evDate := time.Date(ev.Date.Year(), ev.Date.Month(), ev.Date.Day(), 0, 0, 0, 0, now.Location())
+		if evDate.Before(start) || evDate.After(end) {
+			fmt.Printf("Skipping %v\n", ev)
 			continue
 		}
 		key := ev.Date.Format("2006-01-02")
@@ -113,7 +118,7 @@ func handleCal(ctx context.Context, args []string) {
 	for d := range eventsByDate {
 		dates = append(dates, d)
 	}
-	if start == now {
+	if start == nowDate {
 		sort.Strings(dates)
 	} else {
 		sort.Slice(dates, func(i, j int) bool {
@@ -180,6 +185,7 @@ func handlePairings(ctx context.Context, args []string) {
 		fs.Usage()
 		os.Exit(1)
 	}
+
 	tourney, err := bcc.GetTournament(int64(*eventID))
 	if err != nil {
 		log.Fatalf("Error fetching pairings for event %d: %v", *eventID, err)
@@ -199,6 +205,7 @@ func handleStandings(ctx context.Context, args []string) {
 		fs.Usage()
 		os.Exit(1)
 	}
+
 	tourney, err := bcc.GetTournament(int64(*eventID))
 	if err != nil {
 		log.Fatalf("Error fetching standings for event %d: %v", *eventID, err)
@@ -273,7 +280,7 @@ func handleHistory(ctx context.Context, args []string) {
 		fmt.Printf("No recent events found for aid:%v\n", *aid)
 		return
 	}
-	// Build sorted output
+
 	var dates []string
 	for d := range eventsByDate {
 		dates = append(dates, d)

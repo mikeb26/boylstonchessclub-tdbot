@@ -122,7 +122,8 @@ func tdCalCmdHandler(ctx context.Context,
 	}
 
 	now := time.Now()
-	end := now.AddDate(0, 0, int(days))
+	nowDate := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+	end := nowDate.AddDate(0, 0, int(days))
 
 	// Fetch events from BCC API
 	events, err := bcc.GetEvents()
@@ -135,7 +136,9 @@ func tdCalCmdHandler(ctx context.Context,
 	// Filter and group events by date
 	eventsByDate := make(map[string][]bcc.Event)
 	for _, ev := range events {
-		if ev.Date.Before(now) || ev.Date.After(end) {
+		// truncate event date to local date for inclusive comparison
+		evDate := time.Date(ev.Date.Year(), ev.Date.Month(), ev.Date.Day(), 0, 0, 0, 0, nowDate.Location())
+		if evDate.Before(nowDate) || evDate.After(end) {
 			continue
 		}
 		key := ev.Date.Format("2006-01-02")
