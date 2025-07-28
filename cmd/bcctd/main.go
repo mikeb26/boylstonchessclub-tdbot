@@ -150,27 +150,7 @@ func handleEvent(ctx context.Context, args []string) {
 		log.Fatalf("Error fetching event %d: %v", *eventID, err)
 	}
 	// Print event details
-	fmt.Printf("EventID: %d\n", detail.EventID)
-	fmt.Printf("Date: %s\n", detail.DateDisplay)
-	if detail.EventFormat != "" {
-		fmt.Printf("Format: %s\n", detail.EventFormat)
-	}
-	if detail.TimeControl != "" {
-		fmt.Printf("Time Control: %s\n", detail.TimeControl)
-	}
-	if detail.SectionDisplay != "" {
-		fmt.Printf("Sections: %s\n", detail.SectionDisplay)
-	}
-	fmt.Printf("Entry Fee: %s\n", detail.EntryFeeSummary)
-	if detail.PrizeSummary != "" {
-		fmt.Printf("Prizes: %s\n", detail.PrizeSummary)
-	}
-	if detail.RegistrationTime != "" {
-		fmt.Printf("Registration Time: %s\n", detail.RegistrationTime)
-	}
-	fmt.Printf("Round Times: %s\n", detail.RoundTimes)
-	fmt.Printf("Description: %s\n", detail.Description)
-	fmt.Printf("URL: https://boylstonchess.org/events/%d\n", detail.EventID)
+	fmt.Printf("%v", bcc.BuildEventOutput(&detail, "", true, true))
 }
 
 func handlePairings(ctx context.Context, args []string) {

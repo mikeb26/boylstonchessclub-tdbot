@@ -122,7 +122,7 @@ func getTournamentViaApi(eventId int64) (*Tournament, error) {
 	if resp.StatusCode != http.StatusOK {
 		detail, err := GetEventDetail(eventId)
 		if err == nil {
-			return eventDetailToTournament(detail)
+			return eventDetailToTournament(&detail), nil
 		} else {
 			err = fmt.Errorf("unable to fetch %v: http status: %v", url,
 				resp.StatusCode)

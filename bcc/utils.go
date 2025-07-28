@@ -32,7 +32,7 @@ func (s Source) String() string {
 }
 
 // Construct an artificial Tournament from an EventDetail
-func eventDetailToTournament(eventDetail EventDetail) (*Tournament, error) {
+func eventDetailToTournament(eventDetail *EventDetail) *Tournament {
 	// Build tournament players list from event details entries
 	tourney := &Tournament{}
 	for _, entry := range eventDetail.Entries {
@@ -42,7 +42,7 @@ func eventDetailToTournament(eventDetail EventDetail) (*Tournament, error) {
 	tourney.CurrentPairings = predictRound1Pairings(eventDetail.Entries)
 	tourney.isPredicted = true
 
-	return tourney, nil
+	return tourney
 }
 
 // Construct an artificial Player from an Entry

@@ -215,34 +215,11 @@ func tdEventCmdHandler(ctx context.Context,
 		return resp
 	}
 
-	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf("**EventID**: %d\n", detail.EventID))
-	sb.WriteString(fmt.Sprintf("**Date**: %s\n", detail.DateDisplay))
-	if detail.EventFormat != "" {
-		sb.WriteString(fmt.Sprintf("**Format**: %s\n", detail.EventFormat))
-	}
-	if detail.TimeControl != "" {
-		sb.WriteString(fmt.Sprintf("**Time Control**: %s\n",
-			detail.TimeControl))
-	}
-	if detail.SectionDisplay != "" {
-		sb.WriteString(fmt.Sprintf("**Sections**: %s\n", detail.SectionDisplay))
-	}
-	sb.WriteString(fmt.Sprintf("**Entry Fee**: %s\n", detail.EntryFeeSummary))
-	if detail.PrizeSummary != "" {
-		sb.WriteString(fmt.Sprintf("**Prizes**: %s\n", detail.PrizeSummary))
-	}
-	if detail.RegistrationTime != "" {
-		sb.WriteString(fmt.Sprintf("**Registration Time**: %s\n",
-			detail.RegistrationTime))
-	}
-	sb.WriteString(fmt.Sprintf("**Round Times**: %s\n", detail.RoundTimes))
-	sb.WriteString(fmt.Sprintf("**Description**: %s\n", detail.Description))
 	embed := &discordgo.MessageEmbed{
 		Title:       detail.Title,
 		URL:         fmt.Sprintf("https://boylstonchess.org/events/%d", detail.EventID),
 		Type:        discordgo.EmbedTypeLink,
-		Description: sb.String(),
+		Description: bcc.BuildEventOutput(&detail, "**", false, false),
 	}
 	resp.Data.Embeds = []*discordgo.MessageEmbed{embed}
 	if broadcast {

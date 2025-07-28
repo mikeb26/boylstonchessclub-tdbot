@@ -8,6 +8,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"sort"
+	"strings"
 	"time"
 
 	"github.com/mikeb26/boylstonchessclub-tdbot/internal"
@@ -148,4 +150,87 @@ func (e *Entry) UnmarshalJSON(data []byte) error {
 		return fmt.Errorf("parsing Entry.RegistrationDate: %w", err)
 	}
 	return nil
+}
+
+// BuildPairingsOutput formats an EventDetail into a pretty printed string output
+func BuildEventOutput(detail *EventDetail, boldTag string, includeTitle,
+	includeUrl bool) string {
+
+	var sb strings.Builder
+
+	if includeTitle {
+		sb.WriteString(fmt.Sprintf("%vTitle%v: %v\n", boldTag, boldTag,
+			detail.Title))
+	}
+	if includeUrl {
+		sb.WriteString(fmt.Sprintf("%vURL%v: https://boylstonchess.org/events/%d\n",
+			boldTag, boldTag, detail.EventID))
+	}
+
+	sb.WriteString(fmt.Sprintf("%vEventID%v: %d [Register](https://boylstonchess.org/tournament/register/%v)\n",
+		boldTag, boldTag, detail.EventID, detail.EventID))
+	sb.WriteString(fmt.Sprintf("%vDate%v: %s\n", boldTag, boldTag, detail.DateDisplay))
+	if detail.EventFormat != "" {
+		sb.WriteString(fmt.Sprintf("%vFormat%v: %s\n", boldTag, boldTag,
+			detail.EventFormat))
+	}
+	if detail.TimeControl != "" {
+		sb.WriteString(fmt.Sprintf("%vTime Control%v: %s\n", boldTag, boldTag,
+			detail.TimeControl))
+	}
+	if detail.SectionDisplay != "" {
+		sb.WriteString(fmt.Sprintf("%vSections%v: %s\n", boldTag, boldTag,
+			detail.SectionDisplay))
+	}
+	sb.WriteString(fmt.Sprintf("%vEntry Fee%v: %s\n", boldTag, boldTag,
+		detail.EntryFeeSummary))
+	if detail.PrizeSummary != "" {
+		sb.WriteString(fmt.Sprintf("%vPrizes%v: %s\n", boldTag, boldTag,
+			detail.PrizeSummary))
+	}
+	if detail.RegistrationTime != "" {
+		sb.WriteString(fmt.Sprintf("%vRegistration Time%v: %s\n", boldTag,
+			boldTag, detail.RegistrationTime))
+	}
+	sb.WriteString(fmt.Sprintf("%vRound Times%v: %s\n", boldTag, boldTag,
+		detail.RoundTimes))
+	sb.WriteString(fmt.Sprintf("%v[Entries](https://boylstonchess.org/tournament/entries/%v)%v: %v\n",
+		boldTag, detail.EventID, boldTag, buildEntriesString(detail)))
+	sb.WriteString(fmt.Sprintf("%vDescription%v: %s\n", boldTag, boldTag,
+		detail.Description))
+
+	return sb.String()
+}
+
+// buildEntriesString formats a pretty printed string describing the entries
+func buildEntriesString(detail *EventDetail) string {
+	var sb strings.Builder
+
+	t := eventDetailToTournament(detail)
+	secPlayers := getPlayersBySection(t)
+	sb.WriteString(fmt.Sprintf("%v", len(detail.Entries)))
+	if len(secPlayers) > 1 || len(detail.Sections) > 1 {
+		// Sort section names using custom criteria
+		var sectionNames []string
+		for sec := range secPlayers {
+			sectionNames = append(sectionNames, sec)
+		}
+		// Use named sectionSorter instead of anonymous comparator
+		sort.Sort(SectionSorter(sectionNames))
+
+		sb.WriteString(" (")
+		isFirst := true
+		for _, k := range sectionNames {
+			if !isFirst {
+				sb.WriteString(" ")
+			} else {
+				isFirst = false
+			}
+			sb.WriteString(fmt.Sprintf("%v:%v", k, len(secPlayers[k])))
+		}
+		sb.WriteString(")")
+
+	}
+
+	return sb.String()
 }
