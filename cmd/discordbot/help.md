@@ -23,6 +23,12 @@ Available Commands:
                          grouped by section. To share with the channel set
                          broadcast=true (false by default).
 
+  /td player memid=<memberId> [broadcast=<true|false>]
+                         Display information on a specific player
+                         given their USCF member id. To share with the
+                         channel set broadcast=true (false by
+                         default).
+
   /td standings eventid=<eventId> [broadcast=<true|false>]
                          Display current standings for a tournament,
                          grouped by section. To share with the channel set
