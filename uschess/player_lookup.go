@@ -143,12 +143,18 @@ func parseTournamentHistory(player *Player, doc *goquery.Document) error {
 			return
 		}
 
-		// Determine if this is a header row by checking small text is numeric ID
+		// Determine if this is an event row by parsing the small tag
 		dateTd := tds.Eq(0)
-		idText := strings.TrimSpace(dateTd.Find("small").Text())
-		id := 0
-		var err error
-		if id, err = strconv.Atoi(idText); err != nil {
+
+		// Extract event ID, ignore any trailing non-digit suffix (e.g., "**")
+		rawID := strings.TrimSpace(dateTd.Find("small").Text())
+		fields := strings.Fields(rawID)
+		if len(fields) == 0 {
+			return
+		}
+		idStr := fields[0]
+		id, err := strconv.Atoi(idStr)
+		if err != nil {
 			// skip header or non-event rows
 			return
 		}
