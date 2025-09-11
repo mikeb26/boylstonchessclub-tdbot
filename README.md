@@ -17,6 +17,11 @@ Available Commands:
                          specified). To share with the channel set
                          broadcast=true (false by default).
 
+  /td entries eventid=<eventId> [broadcast=<true|false>]
+                         Display current entries for a tournament,
+                         grouped by section. To share with the channel set
+                         broadcast=true (false by default).
+
   /td event eventid=<eventId> [broadcast=<true|false>]
                          Retrieve detailed information regarding an
                          event. To share with the channel set

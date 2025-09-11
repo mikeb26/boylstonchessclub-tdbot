@@ -195,15 +195,16 @@ func BuildEventOutput(detail *EventDetail, boldTag string, includeTitle,
 	sb.WriteString(fmt.Sprintf("%vRound Times%v: %s\n", boldTag, boldTag,
 		detail.RoundTimes))
 	sb.WriteString(fmt.Sprintf("%v[Entries](https://boylstonchess.org/tournament/entries/%v)%v: %v\n",
-		boldTag, detail.EventID, boldTag, buildEntriesString(detail)))
+		boldTag, detail.EventID, boldTag, buildEntriesCountString(detail)))
 	sb.WriteString(fmt.Sprintf("%vDescription%v: %s\n", boldTag, boldTag,
 		detail.Description))
 
 	return sb.String()
 }
 
-// buildEntriesString formats a pretty printed string describing the entries
-func buildEntriesString(detail *EventDetail) string {
+// buildEntriesCountString formats a pretty printed string describing the count
+// of entries in each section
+func buildEntriesCountString(detail *EventDetail) string {
 	var sb strings.Builder
 
 	t := eventDetailToTournament(detail)

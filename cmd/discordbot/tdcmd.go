@@ -25,6 +25,7 @@ const (
 	TdAboutCmd     TdSubCommand = "about"
 	TdHelpCmd      TdSubCommand = "help"
 	TdCalCmd       TdSubCommand = "cal"
+	TdEntriesCmd   TdSubCommand = "entries"
 	TdEventCmd     TdSubCommand = "event"
 	TdPairingsCmd  TdSubCommand = "pairings"
 	TdStandingsCmd TdSubCommand = "standings"
@@ -35,6 +36,7 @@ var tdSubCmdHdlrs = map[TdSubCommand]CmdHandler{
 	TdAboutCmd:     tdAboutCmdHandler,
 	TdHelpCmd:      tdHelpCmdHandler,
 	TdCalCmd:       tdCalCmdHandler,
+	TdEntriesCmd:   tdEntriesCmdHandler,
 	TdEventCmd:     tdEventCmdHandler,
 	TdPairingsCmd:  tdPairingsCmdHandler,
 	TdStandingsCmd: tdStandingsCmdHandler,
@@ -278,6 +280,63 @@ func tdPairingsCmdHandler(ctx context.Context,
 	// Wrap output in code block for monospace formatting in Discord
 	resp.Data.Content = fmt.Sprintf("```\n%s```",
 		truncateContent(bcc.BuildPairingsOutput(tourney)))
+
+	if broadcast {
+		resp.Data.Flags = 0
+	}
+
+	return resp
+}
+
+// tdEntriesCmdHandler handles the /td entries command to display current entries
+func tdEntriesCmdHandler(ctx context.Context,
+	inter *discordgo.Interaction) *discordgo.InteractionResponse {
+
+	resp := &discordgo.InteractionResponse{
+		Type: discordgo.InteractionResponseChannelMessageWithSource,
+		Data: &discordgo.InteractionResponseData{
+			Flags: discordgo.MessageFlagsEphemeral,
+		},
+	}
+	data := inter.ApplicationCommandData()
+	broadcast := false // default
+	var eventID int64
+	if len(data.Options) > 0 {
+		found := false
+		for _, opt := range data.Options[0].Options {
+			if opt.Name == "eventid" {
+				eventID = opt.IntValue()
+				found = true
+			} else if opt.Name == "broadcast" {
+				broadcast = opt.BoolValue()
+			}
+		}
+		if !found {
+			resp.Data.Content = "Please provide an event ID."
+			log.Printf("discordbot.pairings: %v", resp.Data.Content)
+			return resp
+		}
+	} else {
+		resp.Data.Content = "Please provide an event ID."
+		log.Printf("discordbot.pairings: %v", resp.Data.Content)
+		return resp
+	}
+	tourney, err := bcc.GetTournament(eventID)
+	if err != nil {
+		resp.Data.Content = fmt.Sprintf("Error fetching pairings for event %d: %v",
+			eventID, err)
+		log.Printf("discordbot.pairings: %v", resp.Data.Content)
+		return resp
+	}
+	if len(tourney.CurrentPairings) == 0 {
+		resp.Data.Content = fmt.Sprintf("No pairings found for event %d.",
+			eventID)
+		log.Printf("discordbot.pairings: %v", resp.Data.Content)
+		return resp
+	}
+	// Wrap output in code block for monospace formatting in Discord
+	resp.Data.Content = fmt.Sprintf("```\n%s```",
+		truncateContent(bcc.BuildEntriesOutput(tourney)))
 
 	if broadcast {
 		resp.Data.Flags = 0

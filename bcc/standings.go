@@ -73,7 +73,7 @@ func BuildStandingsOutput(t *Tournament) string {
 			if sec == "" {
 				sec = "UNNAMED"
 			}
-			sb.WriteString(fmt.Sprintf("%s Section\n", sec))
+			sb.WriteString(fmt.Sprintf("%s Section (%v players)\n", sec, len(rows)))
 		}
 		sb.WriteString(fmt.Sprintf("%-*s  %-*s  %-*s\n", maxP, "Place", maxN,
 			"Name", maxS, "Score"))

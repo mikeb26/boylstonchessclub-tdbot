@@ -6,6 +6,7 @@ package bcc
 
 import (
 	"fmt"
+	"log"
 	"sort"
 	"strings"
 
@@ -41,6 +42,7 @@ func BuildPairingsOutput(t *Tournament) string {
 		}
 	} else {
 		sb.WriteString("No pairings posted nor predicted")
+		log.Printf("bcc: pairings: empty pairings")
 	}
 
 	for _, sec := range sectionNames {

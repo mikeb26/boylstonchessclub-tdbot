@@ -8,6 +8,10 @@ Available Commands:
                          number of days (14 by default if not
                          specified).
 
+  bcctd entries --eventid <eventId>
+                         Display a list of current entries in a
+			 tournament, grouped by section.
+
   bcctd event --eventid <eventId>
                          Retrieve detailed information regarding an
                          event.

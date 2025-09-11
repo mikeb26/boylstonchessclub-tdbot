@@ -229,6 +229,25 @@ func registerSlashCommands() {
 			},
 			{
 				Type:        discordgo.ApplicationCommandOptionSubCommand,
+				Name:        string(TdEntriesCmd),
+				Description: "Get current entries in an event",
+				Options: []*discordgo.ApplicationCommandOption{
+					{
+						Type:        discordgo.ApplicationCommandOptionInteger,
+						Name:        "eventid",
+						Description: "Event id of the tournament (as returned by cal)",
+						Required:    true,
+					},
+					{
+						Type:        discordgo.ApplicationCommandOptionBoolean,
+						Name:        "broadcast",
+						Description: "Share with the rest of the channel instead of	only to you (default is false)",
+						Required:    false,
+					},
+				},
+			},
+			{
+				Type:        discordgo.ApplicationCommandOptionSubCommand,
 				Name:        string(TdStandingsCmd),
 				Description: "Get current standings for an event",
 				Options: []*discordgo.ApplicationCommandOption{

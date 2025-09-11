@@ -31,6 +31,7 @@ var commands = map[string]cmdHandler{
 	"cal":        handleCal,
 	"event":      handleEvent,
 	"pairings":   handlePairings,
+	"entries":    handleEntries,
 	"standings":  handleStandings,
 	"crosstable": handleCrossTable,
 	"history":    handleHistory,
@@ -170,6 +171,26 @@ func handlePairings(ctx context.Context, args []string) {
 		log.Fatalf("Error fetching pairings for event %d: %v", *eventID, err)
 	}
 	output := bcc.BuildPairingsOutput(tourney)
+	fmt.Print(output)
+}
+
+func handleEntries(ctx context.Context, args []string) {
+	fs := flag.NewFlagSet("entries", flag.ExitOnError)
+	eventID := fs.Int("eventid", 0, "Event ID to fetch pairings for")
+	if err := fs.Parse(args); err != nil {
+		os.Exit(1)
+	}
+	if *eventID <= 0 {
+		fmt.Fprintln(os.Stderr, "Please provide a valid --eventid ID.")
+		fs.Usage()
+		os.Exit(1)
+	}
+
+	tourney, err := bcc.GetTournament(int64(*eventID))
+	if err != nil {
+		log.Fatalf("Error fetching pairings for event %d: %v", *eventID, err)
+	}
+	output := bcc.BuildEntriesOutput(tourney)
 	fmt.Print(output)
 }
 
