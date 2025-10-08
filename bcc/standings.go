@@ -14,9 +14,6 @@ import (
 
 // buildStandingsOutput formats standings into grouped, aligned string output
 func BuildStandingsOutput(t *Tournament) string {
-	if len(t.CurrentPairings) == 0 {
-		return "Cannot determine standings without current pairings"
-	}
 	secPlayers := getPlayersBySection(t)
 	// Sort section names using custom criteria
 	var sectionNames []string
@@ -27,8 +24,7 @@ func BuildStandingsOutput(t *Tournament) string {
 	sort.Sort(SectionSorter(sectionNames))
 	var sb strings.Builder
 
-	sb.WriteString(fmt.Sprintf("Standings prior to Round %v (via %v):\n\n",
-		t.CurrentPairings[0].RoundNumber, t.source.String()))
+	sb.WriteString(fmt.Sprintf("Standings (via %v):\n\n", t.source.String()))
 
 	for sec, players := range secPlayers {
 		sort.Slice(players, func(i, j int) bool {
@@ -89,13 +85,10 @@ func BuildStandingsOutput(t *Tournament) string {
 
 func getPlayersBySection(t *Tournament) map[string][]*Player {
 	secPlayers := make(map[string][]*Player)
-	for idx, pairing := range t.CurrentPairings {
-		secPlayers[pairing.Section] = append(secPlayers[pairing.Section],
-			&t.CurrentPairings[idx].WhitePlayer)
-		if !pairing.IsByePairing {
-			secPlayers[pairing.Section] = append(secPlayers[pairing.Section],
-				&t.CurrentPairings[idx].BlackPlayer)
-		}
+	for idx, _ := range t.Players {
+		player := &t.Players[idx]
+		secPlayers[player.SectionName] = append(secPlayers[player.SectionName],
+			player)
 	}
 
 	return secPlayers

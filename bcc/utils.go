@@ -19,6 +19,7 @@ type Source int
 const (
 	SourceAPI Source = iota
 	SourceWebsite
+	SourceBoth
 )
 
 func (s Source) String() string {
@@ -26,9 +27,12 @@ func (s Source) String() string {
 		return "api"
 	} else if s == SourceWebsite {
 		return "website"
-	} else {
-		return "?"
-	}
+	} else if s == SourceBoth {
+		return "api & website"
+	} // else
+
+	return "?"
+
 }
 
 // Construct an artificial Tournament from an EventDetail
@@ -57,6 +61,7 @@ func entryToPlayer(entry Entry) Player {
 		UscfID:          entry.UscfID,
 		PrimaryRating:   strRatingToInt(entry.PrimaryRating),
 		SecondaryRating: strRatingToInt(entry.SecondaryRating),
+		SectionName:     entry.SectionName,
 	}
 }
 

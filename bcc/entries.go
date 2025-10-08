@@ -6,57 +6,39 @@ package bcc
 
 import (
 	"fmt"
-	"log"
 	"sort"
 	"strings"
 )
 
 // buildEntriesOutput formats entries into grouped, aligned string output
 func BuildEntriesOutput(t *Tournament) string {
-	// Group pairings by section
-	sections := make(map[string][]Pairing)
-	for _, p := range t.CurrentPairings {
-		sections[p.Section] = append(sections[p.Section], p)
-	}
+	secPlayers := getPlayersBySection(t)
 	// Sort section names using custom criteria
 	var sectionNames []string
-	for sec := range sections {
+	for sec := range secPlayers {
 		sectionNames = append(sectionNames, sec)
 	}
 	// Use named sectionSorter instead of anonymous comparator
 	sort.Sort(SectionSorter(sectionNames))
 	var sb strings.Builder
 
-	if len(t.CurrentPairings) == 0 {
-		sb.WriteString("** error: missing pairings")
-		log.Printf("bcc: entries: empty pairings")
-		return sb.String()
-	}
-
 	for _, sec := range sectionNames {
-		list := sections[sec]
+		list := secPlayers[sec]
 
 		type row struct {
 			player, rating   string
 			memid, ratingInt int
 		}
 		var rows []row
-		for _, p := range list {
-			player := &p.WhitePlayer
-			for {
-				n := player.DisplayName
-				r := "unrated"
-				if player.PrimaryRating != 0 {
-					r = fmt.Sprintf("%v", player.PrimaryRating)
-				}
-				id := player.UscfID
-				rows = append(rows, row{player: n, rating: r, memid: id,
-					ratingInt: player.PrimaryRating})
-				if player == &p.BlackPlayer || p.IsByePairing {
-					break
-				}
-				player = &p.BlackPlayer
+		for _, player := range list {
+			n := player.DisplayName
+			r := "unrated"
+			if player.PrimaryRating != 0 {
+				r = fmt.Sprintf("%v", player.PrimaryRating)
 			}
+			id := player.UscfID
+			rows = append(rows, row{player: n, rating: r, memid: id,
+				ratingInt: player.PrimaryRating})
 		}
 
 		sort.Slice(rows, func(i, j int) bool {

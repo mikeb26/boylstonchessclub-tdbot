@@ -54,6 +54,7 @@ type Player struct {
 	GamesCompleted       int     `json:"gamesCompleted"`
 	Place                string  `json:"place"`
 	PlaceNumber          int     `json:"placeNumber"`
+	SectionName          string  `json:"sectionName"`
 
 	emptyResult bool
 }
@@ -89,15 +90,29 @@ func GetTournament(eventId int64) (*Tournament, error) {
 	}()
 	wg.Wait()
 
-	// prefer the api response
 	if apiErr != nil {
 		if webErr != nil {
+			// both errored; prefer the api error response
 			return tViaApi, apiErr
-		} // else
+		} // else api errored; use the web response
 		return tViaWeb, nil
-	} // else
+	} else if webErr != nil {
+		// web errored, use the api response
+		return tViaApi, nil
+	} // else both api and web were successful, prefer the api response
+	// but there are situations where it returns stale data and we should
+	// patch it from data from the web response.
+	if len(tViaApi.CurrentPairings) > 0 &&
+		len(tViaWeb.CurrentPairings) > 0 &&
+		tViaApi.CurrentPairings[0].RoundNumber <
+			tViaWeb.CurrentPairings[0].RoundNumber {
 
-	return tViaApi, apiErr
+		// api is returning stale pairing data, so prefer the web response
+		tViaApi.CurrentPairings = tViaWeb.CurrentPairings
+		tViaApi.source = SourceBoth
+	}
+
+	return tViaApi, nil
 }
 
 // getTournamentViaApi fetches the tournament data (players and pairings) for a
@@ -139,7 +154,7 @@ func getTournamentViaApi(eventId int64) (*Tournament, error) {
 			err)
 	}
 
-	if len(tourney.CurrentPairings) == 0 && len(tourney.Players) == 0 {
+	if len(tourney.Players) == 0 {
 		err = fmt.Errorf("bcc tournament API returned an empty response")
 		return &Tournament{}, err
 	}
@@ -325,6 +340,8 @@ func fixupStandings(t *Tournament) {
 		}
 	}
 
+	updatePlayersFromPairings(t)
+
 	// compute placeorder
 	maxScore := float64(0.0)
 	secPlayers := getPlayersBySection(t)
@@ -344,6 +361,22 @@ func fixupStandings(t *Tournament) {
 	for idx, _ := range t.CurrentPairings {
 		t.CurrentPairings[idx].RoundNumber = roundNumber
 
+	}
+}
+
+func updatePlayersFromPairings(t *Tournament) {
+	for _, p := range t.CurrentPairings {
+		for idx, _ := range t.Players {
+			pl := &t.Players[idx]
+			check := []*Player{&p.WhitePlayer, &p.BlackPlayer}
+			for _, cp := range check {
+				if cp.DisplayName == pl.DisplayName &&
+					cp.PrimaryRating == pl.PrimaryRating {
+					pl.CurrentScore = cp.CurrentScore
+					pl.CurrentScoreAG = cp.CurrentScoreAG
+				}
+			}
+		}
 	}
 }
 
@@ -390,20 +423,43 @@ func parsePairingRow(row *goquery.Selection, section string) (*Pairing, bool) {
 		bResPtr = &tmp
 	}
 
-	// adjust CurrentScoreAG based on result when present
+	// adjust CurrentScoreAG based on result when present, handling “½”
 	if wResPtr != nil {
-		if v, err := strconv.ParseFloat(*wResPtr, 64); err == nil {
+		res := strings.TrimSpace(*wResPtr)
+		var (
+			v  float64
+			ok bool
+		)
+		if strings.Contains(res, "½") {
+			v = 0.5
+			ok = true
+		} else if parsed, err := strconv.ParseFloat(res, 64); err == nil {
+			v = parsed
+			ok = true
+		}
+		if ok {
 			wp.CurrentScoreAG = wp.CurrentScore + v
 			wp.emptyResult = false
 		}
 	}
 	if bResPtr != nil {
-		if v, err := strconv.ParseFloat(*bResPtr, 64); err == nil {
+		res := strings.TrimSpace(*bResPtr)
+		var (
+			v  float64
+			ok bool
+		)
+		if strings.Contains(res, "½") {
+			v = 0.5
+			ok = true
+		} else if parsed, err := strconv.ParseFloat(res, 64); err == nil {
+			v = parsed
+			ok = true
+		}
+		if ok {
 			bp.CurrentScoreAG = bp.CurrentScore + v
 			bp.emptyResult = false
 		}
 	}
-
 	pair := Pairing{
 		Section:     section,
 		RoundNumber: 0,
@@ -418,22 +474,21 @@ func parsePairingRow(row *goquery.Selection, section string) (*Pairing, bool) {
 	// Handle bye pairings
 	if bp.DisplayName == "BYE" && wp.DisplayName != "BYE" {
 		pair.IsByePairing = true
-		var pts float64
+		// same logic: “½”→0.5 or parse float
 		if strings.Contains(whiteRes, "½") {
-			pts = 0.5
+			pts := 0.5
+			pair.WhitePoints = &pts
 		} else if v, err := strconv.ParseFloat(whiteRes, 64); err == nil {
-			pts = v
+			pair.WhitePoints = &v
 		}
-		pair.WhitePoints = &pts
 	} else if wp.DisplayName == "BYE" && bp.DisplayName != "BYE" {
 		pair.IsByePairing = true
-		var pts float64
 		if strings.Contains(blackRes, "½") {
-			pts = 0.5
+			pts := 0.5
+			pair.BlackPoints = &pts
 		} else if v, err := strconv.ParseFloat(blackRes, 64); err == nil {
-			pts = v
+			pair.BlackPoints = &v
 		}
-		pair.BlackPoints = &pts
 	}
 
 	return &pair, true
