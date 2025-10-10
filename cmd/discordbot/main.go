@@ -267,6 +267,31 @@ func registerSlashCommands() {
 			},
 			{
 				Type:        discordgo.ApplicationCommandOptionSubCommand,
+				Name:        string(TdCrossTableCmd),
+				Description: "Get the crosstable for an event and/or section",
+				Options: []*discordgo.ApplicationCommandOption{
+					{
+						Type:        discordgo.ApplicationCommandOptionInteger,
+						Name:        "eventid",
+						Description: "Event id of the tournament (as returned by cal)",
+						Required:    true,
+					},
+					{
+						Type:        discordgo.ApplicationCommandOptionString,
+						Name:        "section",
+						Description: "Section of the tournament to retrieve",
+						Required:    false,
+					},
+					{
+						Type:        discordgo.ApplicationCommandOptionBoolean,
+						Name:        "broadcast",
+						Description: "Share with the rest of the channel instead of	only to you (default is false)",
+						Required:    false,
+					},
+				},
+			},
+			{
+				Type:        discordgo.ApplicationCommandOptionSubCommand,
 				Name:        string(TdPlayerCmd),
 				Description: "Get information regarding a specific player",
 				Options: []*discordgo.ApplicationCommandOption{

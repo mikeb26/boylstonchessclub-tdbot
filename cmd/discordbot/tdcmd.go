@@ -22,25 +22,27 @@ import (
 type TdSubCommand string
 
 const (
-	TdAboutCmd     TdSubCommand = "about"
-	TdHelpCmd      TdSubCommand = "help"
-	TdCalCmd       TdSubCommand = "cal"
-	TdEntriesCmd   TdSubCommand = "entries"
-	TdEventCmd     TdSubCommand = "event"
-	TdPairingsCmd  TdSubCommand = "pairings"
-	TdStandingsCmd TdSubCommand = "standings"
-	TdPlayerCmd    TdSubCommand = "player"
+	TdAboutCmd      TdSubCommand = "about"
+	TdHelpCmd       TdSubCommand = "help"
+	TdCalCmd        TdSubCommand = "cal"
+	TdEntriesCmd    TdSubCommand = "entries"
+	TdEventCmd      TdSubCommand = "event"
+	TdPairingsCmd   TdSubCommand = "pairings"
+	TdStandingsCmd  TdSubCommand = "standings"
+	TdPlayerCmd     TdSubCommand = "player"
+	TdCrossTableCmd TdSubCommand = "crosstable"
 )
 
 var tdSubCmdHdlrs = map[TdSubCommand]CmdHandler{
-	TdAboutCmd:     tdAboutCmdHandler,
-	TdHelpCmd:      tdHelpCmdHandler,
-	TdCalCmd:       tdCalCmdHandler,
-	TdEntriesCmd:   tdEntriesCmdHandler,
-	TdEventCmd:     tdEventCmdHandler,
-	TdPairingsCmd:  tdPairingsCmdHandler,
-	TdStandingsCmd: tdStandingsCmdHandler,
-	TdPlayerCmd:    tdPlayerCmdHandler,
+	TdAboutCmd:      tdAboutCmdHandler,
+	TdHelpCmd:       tdHelpCmdHandler,
+	TdCalCmd:        tdCalCmdHandler,
+	TdEntriesCmd:    tdEntriesCmdHandler,
+	TdEventCmd:      tdEventCmdHandler,
+	TdPairingsCmd:   tdPairingsCmdHandler,
+	TdStandingsCmd:  tdStandingsCmdHandler,
+	TdPlayerCmd:     tdPlayerCmdHandler,
+	TdCrossTableCmd: tdCrossTableCmdHandler,
 }
 
 func tdCmdHandler(ctx context.Context,
@@ -72,7 +74,7 @@ func tdAboutCmdHandler(ctx context.Context,
 		},
 	}
 
-	resp.Data.Content = truncateContent(aboutText)
+	resp.Data.Content, _ = truncateContent(aboutText)
 
 	return resp
 }
@@ -90,7 +92,7 @@ func tdHelpCmdHandler(ctx context.Context,
 		},
 	}
 
-	resp.Data.Content = truncateContent(helpText)
+	resp.Data.Content, _ = truncateContent(helpText)
 	return resp
 }
 
@@ -167,7 +169,7 @@ func tdCalCmdHandler(ctx context.Context,
 		}
 	}
 	sb.WriteString("\nRun /td event <EventID> to get details on a specific event\n")
-	resp.Data.Content = truncateContent(sb.String())
+	resp.Data.Content, _ = truncateContent(sb.String())
 
 	if broadcast {
 		resp.Data.Flags = 0
@@ -231,6 +233,97 @@ func tdEventCmdHandler(ctx context.Context,
 	return resp
 }
 
+func tdCrossTableCmdHandler(ctx context.Context,
+	inter *discordgo.Interaction) *discordgo.InteractionResponse {
+
+	resp := &discordgo.InteractionResponse{
+		Type: discordgo.InteractionResponseChannelMessageWithSource,
+		Data: &discordgo.InteractionResponseData{
+			Flags: discordgo.MessageFlagsEphemeral,
+		},
+	}
+
+	data := inter.ApplicationCommandData()
+	broadcast := false // default
+	section := ""
+	var eventID int64
+	if len(data.Options) > 0 {
+		found := false
+		for _, opt := range data.Options[0].Options {
+			if opt.Name == "eventid" {
+				eventID = opt.IntValue()
+				found = true
+			} else if opt.Name == "broadcast" {
+				broadcast = opt.BoolValue()
+			} else if opt.Name == "section" {
+				section = opt.StringValue()
+			}
+		}
+		if !found {
+			resp.Data.Content = "Please provide an event ID."
+			log.Printf("discordbot.xt: %v", resp.Data.Content)
+			return resp
+		}
+	} else {
+		resp.Data.Content = "Please provide an event ID."
+		log.Printf("discordbot.xt: %v", resp.Data.Content)
+		return resp
+	}
+
+	detail, err := bcc.GetEventDetail(eventID)
+	if err != nil {
+		resp.Data.Content = fmt.Sprintf("Error fetching event %d: %v", eventID, err)
+		log.Printf("discordbot.xt: %v", resp.Data.Content)
+		return resp
+	}
+
+	if detail.UscfTid == 0 {
+		resp.Data.Content = fmt.Sprintf("The club has not yet filed event %v with USCF. crosstable currently only works for events filed with USCF; please try again once the club files it.",
+			eventID)
+		log.Printf("discordbot.xt: %v", resp.Data.Content)
+		return resp
+	}
+	t, err := uschessClient.FetchCrossTables(ctx, uschess.EventID(detail.UscfTid))
+	if err != nil {
+		resp.Data.Content = fmt.Sprintf("Error fetching crosstables for eventid %d: %v", eventID, err)
+		log.Printf("discordbot.xt: %v", resp.Data.Content)
+		return resp
+	}
+
+	var sb strings.Builder
+	sectionList := ""
+	sectionCount := 0
+	for _, xt := range t.CrossTables {
+		if section != "" &&
+			!strings.Contains(strings.ToLower(xt.SectionName), strings.ToLower(section)) {
+			continue
+		}
+		if sectionList == "" {
+			sectionList = xt.SectionName
+		} else {
+			sectionList = fmt.Sprintf("%v, %v", sectionList, xt.SectionName)
+		}
+		output := uschess.BuildOneCrossTableOutput(xt, len(t.CrossTables) > 1, 0)
+		sb.WriteString(output)
+		sectionCount++
+	}
+
+	// Wrap output in code block for monospace formatting in Discord
+	content, truncated := truncateContent(sb.String())
+	resp.Data.Content = fmt.Sprintf("```\n%s```", content)
+	if truncated && section == "" && sectionCount > 1 {
+		resp.Data.Content = fmt.Sprintf("Too much data. Please try again and specify one of the following sections: %v", sectionList)
+		log.Printf("discordbot.xt: %v", resp.Data.Content)
+		return resp
+	}
+
+	if broadcast {
+		resp.Data.Flags = 0
+	}
+
+	return resp
+}
+
 // tdPairingsCmdHandler handles the /td pairings command to display current pairings
 func tdPairingsCmdHandler(ctx context.Context,
 	inter *discordgo.Interaction) *discordgo.InteractionResponse {
@@ -278,8 +371,8 @@ func tdPairingsCmdHandler(ctx context.Context,
 		return resp
 	}
 	// Wrap output in code block for monospace formatting in Discord
-	resp.Data.Content = fmt.Sprintf("```\n%s```",
-		truncateContent(bcc.BuildPairingsOutput(tourney)))
+	content, _ := truncateContent(bcc.BuildPairingsOutput(tourney))
+	resp.Data.Content = fmt.Sprintf("```\n%s```", content)
 
 	if broadcast {
 		resp.Data.Flags = 0
@@ -335,8 +428,8 @@ func tdEntriesCmdHandler(ctx context.Context,
 		return resp
 	}
 	// Wrap output in code block for monospace formatting in Discord
-	resp.Data.Content = fmt.Sprintf("```\n%s```",
-		truncateContent(bcc.BuildEntriesOutput(tourney)))
+	content, _ := truncateContent(bcc.BuildEntriesOutput(tourney))
+	resp.Data.Content = fmt.Sprintf("```\n%s```", content)
 
 	if broadcast {
 		resp.Data.Flags = 0
@@ -388,9 +481,8 @@ func tdStandingsCmdHandler(ctx context.Context,
 	}
 
 	// Wrap output in code block for monospace formatting in Discord
-	resp.Data.Content =
-		fmt.Sprintf("```\n%s```",
-			truncateContent(bcc.BuildStandingsOutput(tourney)))
+	content, _ := truncateContent(bcc.BuildStandingsOutput(tourney))
+	resp.Data.Content = fmt.Sprintf("```\n%s```", content)
 
 	if broadcast {
 		resp.Data.Flags = 0
@@ -444,7 +536,8 @@ func tdPlayerCmdHandler(ctx context.Context,
 	}
 
 	// Wrap output in code block for monospace formatting in Discord
-	resp.Data.Content = fmt.Sprintf("```\n%s```", truncateContent(report))
+	content, _ := truncateContent(report)
+	resp.Data.Content = fmt.Sprintf("```\n%s```", content)
 
 	if broadcast {
 		resp.Data.Flags = 0
@@ -455,11 +548,13 @@ func tdPlayerCmdHandler(ctx context.Context,
 
 // https://discord.com/developers/docs/resources/channel#start-thread-in-forum-or-media-channel-forum-and-media-thread-message-params-object
 // limits messages to 2k characters
-func truncateContent(s string) string {
+func truncateContent(s string) (string, bool) {
+	truncated := false
 	const MsgLimit = 1988 // keep space for newlines and markdown
 	runes := []rune(s)
 	if len(runes) > MsgLimit {
 		s = fmt.Sprintf("%v...", string(runes[:MsgLimit]))
+		truncated = true
 	}
-	return s
+	return s, truncated
 }

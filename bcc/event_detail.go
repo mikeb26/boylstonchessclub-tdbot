@@ -40,6 +40,7 @@ type EventDetail struct {
 	LastChangeDate      time.Time `json:"lastChangeDate"`
 	NumEntries          int       `json:"numEntries"`
 	Entries             []Entry   `json:"entries"`
+	UscfTid             int       `json:"msaEventId"`
 }
 
 // Entry represents a single registration entry for an event.
@@ -167,8 +168,13 @@ func BuildEventOutput(detail *EventDetail, boldTag string, includeTitle,
 			boldTag, boldTag, detail.EventID))
 	}
 
-	sb.WriteString(fmt.Sprintf("%vEventID%v: %d [Register](https://boylstonchess.org/tournament/register/%v)\n",
-		boldTag, boldTag, detail.EventID, detail.EventID))
+	if detail.UscfTid != 0 {
+		sb.WriteString(fmt.Sprintf("%vEventID%v: %d [Results](https://www.uschess.org/msa/XtblMain.php?%v.0)\n",
+			boldTag, boldTag, detail.EventID, detail.UscfTid))
+	} else {
+		sb.WriteString(fmt.Sprintf("%vEventID%v: %d [Register](https://boylstonchess.org/tournament/register/%v)\n",
+			boldTag, boldTag, detail.EventID, detail.EventID))
+	}
 	sb.WriteString(fmt.Sprintf("%vDate%v: %s\n", boldTag, boldTag, detail.DateDisplay))
 	if detail.EventFormat != "" {
 		sb.WriteString(fmt.Sprintf("%vFormat%v: %s\n", boldTag, boldTag,

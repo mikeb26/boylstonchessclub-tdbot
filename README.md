@@ -17,6 +17,11 @@ Available Commands:
                          specified). To share with the channel set
                          broadcast: true (false by default).
 
+  /td crosstable eventid: <eventId> [section: <sectionName>] [broadcast: <true|false>]
+                         Display crosstables for a completed tournament. To show only a
+						 single section also specify the section name. To share with the
+						 channel set broadcast: true (false by default).
+
   /td entries eventid: <eventId> [broadcast: <true|false>]
                          Display current entries for a tournament,
                          grouped by section. To share with the channel set
