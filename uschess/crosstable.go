@@ -152,18 +152,13 @@ func (client *Client) FetchCrossTables(ctx context.Context,
 			raw := strings.TrimSpace(nxt.Text())
 			parts := strings.Split(raw, "thru")
 			if len(parts) == 2 {
-				endRaw := strings.TrimSpace(parts[1])
-				dt, err := internal.ParseDateOrZero(endRaw)
-				if err != nil {
-					log.Printf("warning: unable to parse event end date %v: %v", endRaw, err)
-				} else {
+				dt, err := internal.ParseDateOrZero(strings.TrimSpace(parts[1]))
+				if err == nil {
 					endDate = dt
 				}
-			} else if len(parts) == 1 {
+			} else {
 				dt, err := internal.ParseDateOrZero(strings.TrimSpace(parts[0]))
-				if err != nil {
-					log.Printf("warning: unable to parse event end date %v: %v", parts[0], err)
-				} else {
+				if err == nil {
 					endDate = dt
 				}
 			}
@@ -222,37 +217,27 @@ func parseOneCrossTable(sel *goquery.Selection, sectionName string) *CrossTable 
 	text := sel.Text()
 	lines := strings.Split(text, "\n")
 
-	// Locate header line and record '|' positions
-	headerIdx := -1
-	var separators []int
+	// Locate header lines
+	head1Idx, head2Idx := -1, -1
 	for ln, l := range lines {
-		if strings.Contains(l, "Pair") && strings.Contains(l, "|") {
-			headerIdx = ln
-			for idx, r := range l {
-				if r == '|' {
-					separators = append(separators, idx)
-				}
-			}
+		if head1Idx < 0 && strings.Contains(l, "Pair") && strings.Contains(l, "|") {
+			head1Idx = ln
+			continue
+		}
+		if head1Idx >= 0 && head2Idx < 0 && strings.Contains(l, "USCF ID") && strings.Contains(l, "|") {
+			head2Idx = ln
 			break
 		}
 	}
-	if headerIdx < 0 || len(separators) < 4 {
+	if head1Idx < 0 || head2Idx < 0 {
 		return nil
 	}
 
-	// Build column boundaries
-	boundaries := []int{-1}
-	boundaries = append(boundaries, separators...)
-	endPos := len(lines[headerIdx])
-	boundaries = append(boundaries, endPos)
-	numCols := len(boundaries) - 1
+	// Count rounds and determine data start
+	numRounds := strings.Count(lines[head1Idx], "Round")
+	start := head2Idx + 2
 
-	// Count rounds
-	numRounds := strings.Count(lines[headerIdx], "Round")
-	start := headerIdx + 2
-
-	entries := parseCrossTableEntries(start, numCols, lines, boundaries,
-		numRounds)
+	entries := parseCrossTableEntries(start, lines, numRounds)
 
 	return &CrossTable{
 		SectionName:   sectionName,
@@ -263,9 +248,12 @@ func parseOneCrossTable(sel *goquery.Selection, sectionName string) *CrossTable 
 	}
 }
 
-func parseCrossTableEntries(start, numCols int,
-	lines []string, boundaries []int, numRounds int) []CrossTableEntry {
-
+// parseCrossTableEntries splits each pair of lines for one player by '|' to extract fields.
+func parseCrossTableEntries(
+	start int,
+	lines []string,
+	numRounds int,
+) []CrossTableEntry {
 	// Prepare regexes
 	digitsRe := regexp.MustCompile(`\d+`)
 	dataLineRe := regexp.MustCompile(`^\s*\d+\s*\|`)
@@ -284,69 +272,64 @@ func parseCrossTableEntries(start, numCols int,
 		}
 		l2 := lines[j+1]
 
-		// Split fields by column boundaries
-		c1 := make([]string, numCols)
-		c2 := make([]string, numCols)
-		for k := 0; k < numCols; k++ {
-			sp := boundaries[k] + 1
-			ep := boundaries[k+1]
-			if sp < 0 {
-				sp = 0
-			}
-			if ep > len(l1) {
-				ep = len(l1)
-			}
-			c1[k] = strings.TrimSpace(l1[sp:ep])
-			if ep > len(l2) {
-				ep = len(l2)
-			}
-			c2[k] = strings.TrimSpace(l2[sp:ep])
+		// Split fields by pipe
+		parts1 := strings.Split(l1, "|")
+		parts2 := strings.Split(l2, "|")
+		if len(parts1) < 3+numRounds || len(parts2) < 3+numRounds {
+			continue
 		}
 
-		// Extract player ID and ratings
-		m := idRe.FindStringSubmatch(c2[1])
+		// Parse basic fields
+		pairNum, err := strconv.Atoi(strings.TrimSpace(parts1[0]))
+		if err != nil {
+			continue
+		}
+		name := strings.TrimSpace(parts1[1])
+		totalPts, err := strconv.ParseFloat(strings.TrimSpace(parts1[2]), 64)
+		if err != nil {
+			totalPts = 0
+		}
+
+		// Parse ID and ratings
+		m := idRe.FindStringSubmatch(strings.TrimSpace(parts2[1]))
 		if len(m) != 4 {
 			continue
 		}
-		// Player ID
 		playerID, _ := strconv.Atoi(m[1])
-		// Keep full rating strings including any provisional suffixes
 		preRating := strings.TrimSpace(m[2])
 		postRating := strings.TrimSpace(m[3])
-		totalPts, _ := strconv.ParseFloat(c1[2], 64)
-		pairNum, _ := strconv.Atoi(c1[0])
-		name := c1[1]
 
 		// Parse round results
 		var results []RoundResult
 		for r := 0; r < numRounds; r++ {
-			cellRes := strings.TrimSpace(c1[3+r])
-			cellCol := strings.TrimSpace(c2[3+r])
-			if cellRes == "" || !strings.ContainsAny(cellRes, "WLDUXFHB") {
-				results = append(results, RoundResult{Outcome: ResultUnknown})
-				continue
-			}
-			op := digitsRe.FindString(cellRes)
-			opNum, _ := strconv.Atoi(op)
+			cellRes := strings.TrimSpace(parts1[3+r])
+			cellCol := strings.TrimSpace(parts2[3+r])
 			var outcome Result
-			switch cellRes[0] {
-			case 'W':
-				outcome = ResultWin
-			case 'L':
-				outcome = ResultLoss
-			case 'D':
-				outcome = ResultDraw
-			case 'U':
-				outcome = ResultUnplayedGame
-			case 'X':
-				outcome = ResultWinByForfeit
-			case 'F':
-				outcome = ResultLossByForfeit
-			case 'H':
-				outcome = ResultHalfBye
-			case 'B':
-				outcome = ResultFullBye
-			default:
+			var opNum int
+			if cellRes != "" && strings.ContainsAny(cellRes, "WLDUXFHB") {
+				op := digitsRe.FindString(cellRes)
+				opNum, _ = strconv.Atoi(op)
+				switch cellRes[0] {
+				case 'W':
+					outcome = ResultWin
+				case 'L':
+					outcome = ResultLoss
+				case 'D':
+					outcome = ResultDraw
+				case 'U':
+					outcome = ResultUnplayedGame
+				case 'X':
+					outcome = ResultWinByForfeit
+				case 'F':
+					outcome = ResultLossByForfeit
+				case 'H':
+					outcome = ResultHalfBye
+				case 'B':
+					outcome = ResultFullBye
+				default:
+					outcome = ResultUnknown
+				}
+			} else {
 				outcome = ResultUnknown
 			}
 			col := ""
@@ -355,8 +338,11 @@ func parseCrossTableEntries(start, numCols int,
 			} else if strings.ToUpper(cellCol) == "B" {
 				col = "black"
 			}
-			results = append(results, RoundResult{OpponentPairNum: opNum,
-				Outcome: outcome, Color: col})
+			results = append(results, RoundResult{
+				OpponentPairNum: opNum,
+				Outcome:         outcome,
+				Color:           col,
+			})
 		}
 
 		entries = append(entries, CrossTableEntry{
@@ -436,17 +422,15 @@ func BuildOneCrossTableOutput(xt *CrossTable,
 			var cell string
 			switch res.Outcome {
 			case ResultWin:
-				cell = fmt.Sprintf("W%d", res.OpponentPairNum)
-				cell += fmt.Sprintf("(%c)", res.Color[0])
+				cell = fmt.Sprintf("W%d(%c)", res.OpponentPairNum, res.Color[0])
 			case ResultWinByForfeit:
 				forfeitFound = true
-				cell = fmt.Sprintf("W*")
+				cell = "W*"
 			case ResultLoss:
-				cell = fmt.Sprintf("L%d", res.OpponentPairNum)
-				cell += fmt.Sprintf("(%c)", res.Color[0])
+				cell = fmt.Sprintf("L%d(%c)", res.OpponentPairNum, res.Color[0])
 			case ResultLossByForfeit:
 				forfeitFound = true
-				cell = fmt.Sprintf("L*")
+				cell = "L*"
 			case ResultDraw:
 				cell = fmt.Sprintf("D%d", res.OpponentPairNum)
 				cell += fmt.Sprintf("(%c)", res.Color[0])

@@ -5,7 +5,7 @@
 package internal
 
 const (
-	UserAgent          = "boylstonchessclub-tdbot/0.11.3 (+https://github.com/mikeb26/boylstonchessclub-tdbot)"
+	UserAgent          = "boylstonchessclub-tdbot/0.12.0 (+https://github.com/mikeb26/boylstonchessclub-tdbot)"
 	BccUSCFAffiliateID = "A5000408"
 	WebCacheBucket     = "bopmatic-boylstonchessclub-tdbot-prod-webcache"
 )
