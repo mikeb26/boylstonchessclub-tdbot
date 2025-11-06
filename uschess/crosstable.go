@@ -281,7 +281,10 @@ func convertStandingsToCrossTable(standings apiStandingsResponse, sectionName st
 		}
 
 		// Convert member ID to int
-		memberID, _ := strconv.Atoi(item.MemberID)
+		memberID, err := strconv.Atoi(item.MemberID)
+		if err != nil {
+			log.Printf("warning: failed to convert member ID %v to int: %v", item.MemberID, err)
+		}
 
 		entry := CrossTableEntry{
 			PairNum:          item.Ordinal,
