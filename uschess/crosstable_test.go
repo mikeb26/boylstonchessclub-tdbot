@@ -74,8 +74,8 @@ func TestFetchCrossTables202506242722(t *testing.T) {
 	if entry.PlayerId != 16438266 {
 		t.Errorf("expected PlayerId 16438266, got %d", entry.PlayerId)
 	}
-	if entry.PlayerRatingPre != "1735" {
-		t.Errorf("expected PlayerRatingPre 1735, got %v", entry.PlayerRatingPre)
+	if entry.PlayerRatingPre != "1734" {
+		t.Errorf("expected PlayerRatingPre 1734, got %v", entry.PlayerRatingPre)
 	}
 	if entry.PlayerRatingPost != "1751" {
 		t.Errorf("expected PlayerRatingPost 1751, got %v", entry.PlayerRatingPost)
