@@ -169,7 +169,7 @@ func BuildEventOutput(detail *EventDetail, boldTag string, includeTitle,
 	}
 
 	if detail.UscfTid != 0 {
-		sb.WriteString(fmt.Sprintf("%vEventID%v: %d [Results](https://www.uschess.org/msa/XtblMain.php?%v.0)\n",
+		sb.WriteString(fmt.Sprintf("%vEventID%v: %d [Results](https://ratings.uschess.org/event/%v)\n",
 			boldTag, boldTag, detail.EventID, detail.UscfTid))
 	} else {
 		sb.WriteString(fmt.Sprintf("%vEventID%v: %d [Register](https://boylstonchess.org/tournament/register/%v)\n",
