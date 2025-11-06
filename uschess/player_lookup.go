@@ -33,17 +33,11 @@ type Player struct {
 }
 
 // FetchPlayer retrieves player information for the given USCF member ID using
-// the "Member Tournament History" endpoint
-// (https://www.uschess.org/msa/MbrDtlTnmtHst.php). I alternatively tested
-// https://www.uschess.org/msa/thin.php, https://www.uschess.org/msa/thin3.php,
-// and ttps://www.uschess.org/msa/MbrDtlMain.php but all had terrible
-// latency (>2s). I also considered
-// https://new.uschess.org/civicrm/player-search but this seems like it would
-// have required a headless browser to utilize.
+// the "Player Profile" endpoint (https://ratings.uschess.org/player/).
 func (client *Client) FetchPlayer(ctx context.Context,
 	memberID MemID) (*Player, error) {
 
-	endpoint := fmt.Sprintf("https://www.uschess.org/msa/MbrDtlTnmtHst.php?%v", memberID)
+	endpoint := fmt.Sprintf("https://ratings.uschess.org/player/%v", memberID)
 
 	req, err := http.NewRequest("GET", endpoint, nil)
 	if err != nil {
