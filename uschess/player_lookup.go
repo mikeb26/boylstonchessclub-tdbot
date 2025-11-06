@@ -133,7 +133,11 @@ func (client *Client) FetchPlayer(ctx context.Context,
 	// Convert events
 	player.TotalEvents = len(eventsData.Items)
 	for _, item := range eventsData.Items {
-		eventID, _ := strconv.Atoi(item.ID)
+		eventID, err := strconv.Atoi(item.ID)
+		if err != nil {
+			// Skip events with invalid IDs
+			continue
+		}
 		endDate, _ := internal.ParseDateOrZero(item.EndDate)
 		player.RecentEvents = append(player.RecentEvents, Event{
 			ID:      EventID(eventID),
