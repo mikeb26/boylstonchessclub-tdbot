@@ -12,6 +12,8 @@ import (
 	"net/http"
 	"testing"
 	"time"
+
+	"github.com/mikeb26/boylstonchessclub-tdbot/internal"
 )
 
 func TestHttpClient(t *testing.T) {
@@ -30,7 +32,7 @@ func TestHttpClient(t *testing.T) {
 			log.Printf("discordbot.test: unable to fetch uscf crosstable (new): %v", err)
 			return
 		}
-		req.Header.Set("User-Agent", UserAgent)
+		req.Header.Set("User-Agent", internal.UserAgent)
 		resp, err := client.Do(req)
 		if err != nil {
 			log.Printf("discordbot.test: unable to fetch uscf crosstable (do): %v", err)
