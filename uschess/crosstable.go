@@ -6,13 +6,14 @@ package uschess
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"regexp"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/mikeb26/boylstonchessclub-tdbot/internal"
@@ -76,111 +77,265 @@ type Tournament struct {
 	CrossTables []*CrossTable
 }
 
+// API response structures for rated events JSON API
+type apiRatedEventResponse struct {
+	ID           string `json:"id"`
+	Name         string `json:"name"`
+	StartDate    string `json:"startDate"`
+	EndDate      string `json:"endDate"`
+	SectionCount int    `json:"sectionCount"`
+	Sections     []struct {
+		ID     string `json:"id"`
+		Number int    `json:"number"`
+		Name   string `json:"name"`
+	} `json:"sections"`
+}
+
+type apiStandingsResponse struct {
+	Items []apiStandingItem `json:"items"`
+}
+
+type apiStandingItem struct {
+	Ordinal       int                `json:"ordinal"`
+	PairingNumber int                `json:"pairingNumber"`
+	MemberID      string             `json:"memberId"`
+	FirstName     string             `json:"firstName"`
+	LastName      string             `json:"lastName"`
+	Score         float64            `json:"score"`
+	RoundOutcomes []apiRoundOutcome  `json:"roundOutcomes"`
+	Ratings       []apiRatingChange  `json:"ratings"`
+}
+
+type apiRoundOutcome struct {
+	RoundNumber           int    `json:"roundNumber"`
+	Outcome               string `json:"outcome"`
+	Color                 string `json:"color"`
+	OpponentOrdinal       int    `json:"opponentOrdinal"`
+	OpponentPairingNumber int    `json:"opponentPairingNumber"`
+}
+
+type apiRatingChange struct {
+	PreRating    int    `json:"preRating"`
+	PostRating   int    `json:"postRating"`
+	RatingSystem string `json:"ratingSystem"`
+}
+
 // FetchCrossTables retrieves a Tournament with all sections' cross tables for the given event id.
 func (client *Client) FetchCrossTables(ctx context.Context,
 	id EventID) (*Tournament, error) {
 
-	url := fmt.Sprintf("https://www.uschess.org/msa/XtblMain.php?%v.0", id)
-
-	req, err := http.NewRequest("GET", url, nil)
+	// Fetch event metadata
+	eventURL := fmt.Sprintf("https://ratings-api.uschess.org/api/v1/rated-events/%v", id)
+	req, err := http.NewRequest("GET", eventURL, nil)
 	if err != nil {
-		return nil, fmt.Errorf("unable to fetch uscf crosstable (new): %w", err)
+		return nil, fmt.Errorf("unable to create event request: %w", err)
 	}
 	req.Header.Set("User-Agent", internal.UserAgent)
+	req.Header.Set("Accept", "application/json")
 
-	// these are rarely (if ever) updated so 1 month cache is fine for our use
-	// case
+	// these are rarely (if ever) updated so 1 month cache is fine for our use case
 	resp, err := client.httpClient30day.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("unable to fetch uscf crosstable (do): %w", err)
+		return nil, fmt.Errorf("unable to fetch event: %w", err)
 	}
 	defer resp.Body.Close()
 
-	doc, err := goquery.NewDocumentFromReader(resp.Body)
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("unexpected event status %d: %s",
+			resp.StatusCode, string(body))
+	}
+
+	var eventData apiRatedEventResponse
+	if err := json.NewDecoder(resp.Body).Decode(&eventData); err != nil {
+		return nil, fmt.Errorf("failed to parse event JSON: %w", err)
+	}
+
+	// Parse event end date
+	endDate, err := internal.ParseDateOrZero(eventData.EndDate)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse HTML: %w", err)
+		log.Printf("warning: unable to parse event end date %v: %v", eventData.EndDate, err)
 	}
 
-	// Extract section names from section headers
-	var sectionNames []string
-	doc.Find("td[bgcolor=DDDDFF] b").Each(func(_ int, s *goquery.Selection) {
-		txt := strings.TrimSpace(s.Text())
-		if strings.HasPrefix(txt, "Section ") {
-			sectionNames = append(sectionNames, txt)
+	// Fetch standings for each section
+	var crossTables []*CrossTable
+	for _, section := range eventData.Sections {
+		ct, err := client.fetchSectionStandings(ctx, id, section.Number, section.Name)
+		if err != nil {
+			log.Printf("warning: failed to fetch section %d: %v", section.Number, err)
+			continue
 		}
-	})
-
-	// Extract all <pre> blocks (one per section)
-	pres := doc.Find("pre")
-	if pres.Length() != len(sectionNames) {
-		// mismatch is unexpected but proceed with min length
-		log.Printf("warning: found %d sections but %d <pre> blocks",
-			len(sectionNames), pres.Length())
+		crossTables = append(crossTables, ct)
 	}
 
-	var cts []*CrossTable
-	count := pres.Length()
-	if count > len(sectionNames) {
-		count = len(sectionNames)
-	}
-
-	for i := 0; i < count; i++ {
-		ct := parseOneCrossTable(pres.Eq(i), sectionNames[i])
-		cts = append(cts, ct)
-	}
-
-	// Build Tournament object
-	rawTitle := strings.TrimSpace(doc.Find("title").First().Text())
-	// Extract event name between "Cross Table for " and "(Event"
-	eventName := rawTitle
-	prefix := "Cross Table for "
-	if idx := strings.Index(rawTitle, prefix); idx != -1 {
-		if idxEvent := strings.LastIndex(rawTitle, "(Event"); idxEvent != -1 && idxEvent > idx {
-			eventName = strings.TrimSpace(rawTitle[idx+len(prefix) : idxEvent])
-		}
-	}
-
-	// Extract event end date from summary
-	var endDate time.Time
-	doc.Find("td").Each(func(_ int, s *goquery.Selection) {
-		if strings.TrimSpace(s.Text()) == "Event Date(s)" {
-			// skip any empty cell, find next non-empty text cell
-			nxt := s.Next()
-			for nxt.Length() > 0 && strings.TrimSpace(nxt.Text()) == "" {
-				nxt = nxt.Next()
-			}
-			raw := strings.TrimSpace(nxt.Text())
-			parts := strings.Split(raw, "thru")
-			if len(parts) == 2 {
-				endRaw := strings.TrimSpace(parts[1])
-				dt, err := internal.ParseDateOrZero(endRaw)
-				if err != nil {
-					log.Printf("warning: unable to parse event end date %v: %v", endRaw, err)
-				} else {
-					endDate = dt
-				}
-			} else if len(parts) == 1 {
-				dt, err := internal.ParseDateOrZero(strings.TrimSpace(parts[0]))
-				if err != nil {
-					log.Printf("warning: unable to parse event end date %v: %v", parts[0], err)
-				} else {
-					endDate = dt
-				}
-			}
-		}
-	})
-
-	t := &Tournament{
+	return &Tournament{
 		Event: Event{
 			EndDate: endDate,
-			Name:    eventName,
+			Name:    eventData.Name,
 			ID:      id,
 		},
-		NumSections: len(cts),
-		CrossTables: cts,
+		NumSections: len(crossTables),
+		CrossTables: crossTables,
+	}, nil
+}
+
+func (client *Client) fetchSectionStandings(ctx context.Context,
+	eventID EventID, sectionNum int, sectionName string) (*CrossTable, error) {
+
+	url := fmt.Sprintf("https://ratings-api.uschess.org/api/v1/rated-events/%v/sections/%d/standings",
+		eventID, sectionNum)
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("unable to create standings request: %w", err)
+	}
+	req.Header.Set("User-Agent", internal.UserAgent)
+	req.Header.Set("Accept", "application/json")
+
+	resp, err := client.httpClient30day.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("unable to fetch standings: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("unexpected standings status %d: %s",
+			resp.StatusCode, string(body))
 	}
 
-	return t, nil
+	var standingsData apiStandingsResponse
+	if err := json.NewDecoder(resp.Body).Decode(&standingsData); err != nil {
+		return nil, fmt.Errorf("failed to parse standings JSON: %w", err)
+	}
+
+	return convertStandingsToCrossTable(standingsData, sectionName), nil
+}
+
+func convertStandingsToCrossTable(standings apiStandingsResponse, sectionName string) *CrossTable {
+	var entries []CrossTableEntry
+	var numRounds int
+	var ratingType RatingType = RatingTypeRegular
+
+	for _, item := range standings.Items {
+		// Determine rating type from first player's rating system
+		// For dual-rated sections, prefer Regular rating
+		if len(entries) == 0 && len(item.Ratings) > 0 {
+			foundRating := false
+			// First look for Regular rating in dual-rated sections
+			for _, rating := range item.Ratings {
+				if rating.RatingSystem == "R" || rating.RatingSystem == "D" {
+					ratingType = RatingTypeRegular
+					foundRating = true
+					break
+				}
+			}
+			// If no Regular rating found, use the first rating system
+			if !foundRating {
+				switch item.Ratings[0].RatingSystem {
+				case "B":
+					ratingType = RatingTypeBlitz
+				case "Q":
+					ratingType = RatingTypeQuick
+				default:
+					ratingType = RatingTypeRegular
+				}
+			}
+		}
+
+		// Convert round outcomes to RoundResults
+		var results []RoundResult
+		for _, outcome := range item.RoundOutcomes {
+			result := RoundResult{
+				OpponentPairNum: outcome.OpponentOrdinal,
+				Outcome:         convertOutcome(outcome.Outcome),
+				Color:           convertColor(outcome.Color),
+			}
+			results = append(results, result)
+		}
+
+		if len(results) > numRounds {
+			numRounds = len(results)
+		}
+
+		// Get pre and post ratings - prefer the rating that matches our ratingType
+		var preRating, postRating string
+		for _, rating := range item.Ratings {
+			shouldUse := false
+			switch ratingType {
+			case RatingTypeRegular:
+				shouldUse = (rating.RatingSystem == "R" || rating.RatingSystem == "D")
+			case RatingTypeBlitz:
+				shouldUse = (rating.RatingSystem == "B")
+			case RatingTypeQuick:
+				shouldUse = (rating.RatingSystem == "Q")
+			}
+			if shouldUse {
+				if rating.PreRating > 0 {
+					preRating = strconv.Itoa(rating.PreRating)
+				}
+				if rating.PostRating > 0 {
+					postRating = strconv.Itoa(rating.PostRating)
+				}
+				break
+			}
+		}
+
+		// Convert member ID to int
+		memberID, _ := strconv.Atoi(item.MemberID)
+
+		entry := CrossTableEntry{
+			PairNum:          item.Ordinal,
+			PlayerName:       internal.NormalizeName(item.FirstName + " " + item.LastName),
+			PlayerId:         MemID(memberID),
+			PlayerRatingPre:  preRating,
+			PlayerRatingPost: postRating,
+			TotalPoints:      item.Score,
+			Results:          results,
+		}
+		entries = append(entries, entry)
+	}
+
+	return &CrossTable{
+		SectionName:   fmt.Sprintf("Section %s", sectionName),
+		NumRounds:     numRounds,
+		NumPlayers:    len(entries),
+		RType:         ratingType,
+		PlayerEntries: entries,
+	}
+}
+
+func convertOutcome(outcome string) Result {
+	switch outcome {
+	case "Win":
+		return ResultWin
+	case "Loss":
+		return ResultLoss
+	case "Draw":
+		return ResultDraw
+	case "ByeFull":
+		return ResultFullBye
+	case "ByeHalf":
+		return ResultHalfBye
+	case "LossByForfeit":
+		return ResultLossByForfeit
+	case "WinByForfeit":
+		return ResultWinByForfeit
+	case "Unplayed":
+		return ResultUnplayedGame
+	default:
+		return ResultUnknown
+	}
+}
+
+func convertColor(color string) string {
+	switch strings.ToLower(color) {
+	case "white":
+		return "white"
+	case "black":
+		return "black"
+	default:
+		return ""
+	}
 }
 
 func parseOneCrossTable(sel *goquery.Selection, sectionName string) *CrossTable {
