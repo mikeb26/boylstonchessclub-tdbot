@@ -13,8 +13,10 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/mikeb26/boylstonchessclub-tdbot/internal"
+	"golang.org/x/sync/errgroup"
 )
 
 // Result represents the outcome of a round.
@@ -127,17 +129,33 @@ func (client *Client) FetchCrossTables(ctx context.Context,
 		return nil, err
 	}
 
-	// Fetch standings for each section
+	// Fetch standings for each section concurrently using errgroup
 	standingsData := make(map[string]*apiStandingsResponse)
+	var mu sync.Mutex
+	g, gctx := errgroup.WithContext(ctx)
+
 	for _, section := range eventData.Sections {
-		oneStandingsData, err := client.fetchSectionStandings(ctx, id,
-			section.Number, section.Name)
-		if err != nil {
-			log.Printf("warning: failed to fetch section %d: %v",
-				section.Number, err)
-			continue
-		}
-		standingsData[section.Name] = oneStandingsData
+		// Capture loop variables for use in goroutine
+		sec := section
+		g.Go(func() error {
+			oneStandingsData, err := client.fetchSectionStandings(gctx, id,
+				sec.Number, sec.Name)
+			if err != nil {
+				log.Printf("warning: failed to fetch section %d: %v",
+					sec.Number, err)
+				// Don't return error to continue fetching other sections
+				return nil
+			}
+			mu.Lock()
+			standingsData[sec.Name] = oneStandingsData
+			mu.Unlock()
+			return nil
+		})
+	}
+
+	// Wait for all goroutines to complete
+	if err := g.Wait(); err != nil {
+		return nil, err
 	}
 
 	crossTables := convertStandingsToCrossTables(standingsData)
