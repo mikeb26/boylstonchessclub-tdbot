@@ -11,11 +11,9 @@ import (
 	"io"
 	"log"
 	"net/http"
-	"regexp"
 	"strconv"
 	"strings"
 
-	"github.com/PuerkitoBio/goquery"
 	"github.com/mikeb26/boylstonchessclub-tdbot/internal"
 )
 
@@ -96,14 +94,14 @@ type apiStandingsResponse struct {
 }
 
 type apiStandingItem struct {
-	Ordinal       int                `json:"ordinal"`
-	PairingNumber int                `json:"pairingNumber"`
-	MemberID      string             `json:"memberId"`
-	FirstName     string             `json:"firstName"`
-	LastName      string             `json:"lastName"`
-	Score         float64            `json:"score"`
-	RoundOutcomes []apiRoundOutcome  `json:"roundOutcomes"`
-	Ratings       []apiRatingChange  `json:"ratings"`
+	Ordinal       int               `json:"ordinal"`
+	PairingNumber int               `json:"pairingNumber"`
+	MemberID      string            `json:"memberId"`
+	FirstName     string            `json:"firstName"`
+	LastName      string            `json:"lastName"`
+	Score         float64           `json:"score"`
+	RoundOutcomes []apiRoundOutcome `json:"roundOutcomes"`
+	Ratings       []apiRatingChange `json:"ratings"`
 }
 
 type apiRoundOutcome struct {
@@ -124,8 +122,49 @@ type apiRatingChange struct {
 func (client *Client) FetchCrossTables(ctx context.Context,
 	id EventID) (*Tournament, error) {
 
-	// Fetch event metadata
-	eventURL := fmt.Sprintf("https://ratings-api.uschess.org/api/v1/rated-events/%v", id)
+	eventData, err := client.fetchRatedEvent(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	// Fetch standings for each section
+	standingsData := make(map[string]*apiStandingsResponse)
+	for _, section := range eventData.Sections {
+		oneStandingsData, err := client.fetchSectionStandings(ctx, id,
+			section.Number, section.Name)
+		if err != nil {
+			log.Printf("warning: failed to fetch section %d: %v",
+				section.Number, err)
+			continue
+		}
+		standingsData[section.Name] = oneStandingsData
+	}
+
+	crossTables := convertStandingsToCrossTables(standingsData)
+
+	endDate, err := internal.ParseDateOrZero(eventData.EndDate)
+	if err != nil {
+		log.Printf("warning: unable to parse event end date %v: %v",
+			eventData.EndDate, err)
+	}
+
+	return &Tournament{
+		Event: Event{
+			EndDate: endDate,
+			Name:    eventData.Name,
+			ID:      id,
+		},
+		NumSections: len(crossTables),
+		CrossTables: crossTables,
+	}, nil
+}
+
+func (client *Client) fetchRatedEvent(ctx context.Context,
+	id EventID) (*apiRatedEventResponse, error) {
+
+	eventURL :=
+		fmt.Sprintf("https://ratings-api.uschess.org/api/v1/rated-events/%v",
+			id)
 	req, err := http.NewRequest("GET", eventURL, nil)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create event request: %w", err)
@@ -151,36 +190,12 @@ func (client *Client) FetchCrossTables(ctx context.Context,
 		return nil, fmt.Errorf("failed to parse event JSON: %w", err)
 	}
 
-	// Parse event end date
-	endDate, err := internal.ParseDateOrZero(eventData.EndDate)
-	if err != nil {
-		log.Printf("warning: unable to parse event end date %v: %v", eventData.EndDate, err)
-	}
-
-	// Fetch standings for each section
-	var crossTables []*CrossTable
-	for _, section := range eventData.Sections {
-		ct, err := client.fetchSectionStandings(ctx, id, section.Number, section.Name)
-		if err != nil {
-			log.Printf("warning: failed to fetch section %d: %v", section.Number, err)
-			continue
-		}
-		crossTables = append(crossTables, ct)
-	}
-
-	return &Tournament{
-		Event: Event{
-			EndDate: endDate,
-			Name:    eventData.Name,
-			ID:      id,
-		},
-		NumSections: len(crossTables),
-		CrossTables: crossTables,
-	}, nil
+	return &eventData, nil
 }
 
 func (client *Client) fetchSectionStandings(ctx context.Context,
-	eventID EventID, sectionNum int, sectionName string) (*CrossTable, error) {
+	eventID EventID, sectionNum int,
+	sectionName string) (*apiStandingsResponse, error) {
 
 	url := fmt.Sprintf("https://ratings-api.uschess.org/api/v1/rated-events/%v/sections/%d/standings",
 		eventID, sectionNum)
@@ -208,10 +223,21 @@ func (client *Client) fetchSectionStandings(ctx context.Context,
 		return nil, fmt.Errorf("failed to parse standings JSON: %w", err)
 	}
 
-	return convertStandingsToCrossTable(standingsData, sectionName), nil
+	return &standingsData, nil
 }
 
-func convertStandingsToCrossTable(standings apiStandingsResponse, sectionName string) *CrossTable {
+func convertStandingsToCrossTables(standings map[string]*apiStandingsResponse) []*CrossTable {
+	xts := make([]*CrossTable, 0)
+
+	for secName, _ := range standings {
+		xt := convertStandingsToCrossTable(standings[secName], secName)
+		xts = append(xts, xt)
+	}
+
+	return xts
+}
+
+func convertStandingsToCrossTable(standings *apiStandingsResponse, sectionName string) *CrossTable {
 	var entries []CrossTableEntry
 	var numRounds int
 	var ratingType RatingType = RatingTypeRegular
@@ -320,10 +346,16 @@ func convertOutcome(outcome string) Result {
 	case "ByeHalf":
 		return ResultHalfBye
 	case "LossByForfeit":
+		fallthrough
+	case "LossForfeit":
 		return ResultLossByForfeit
+	case "WinForfeit":
+		fallthrough
 	case "WinByForfeit":
 		return ResultWinByForfeit
 	case "Unplayed":
+		fallthrough
+	case "Unpaired":
 		return ResultUnplayedGame
 	default:
 		return ResultUnknown
@@ -341,198 +373,8 @@ func convertColor(color string) string {
 	}
 }
 
-func parseOneCrossTable(sel *goquery.Selection, sectionName string) *CrossTable {
-	// Clean links and italics
-	sel.Find("a, i").Each(func(_ int, s *goquery.Selection) {
-		s.ReplaceWithHtml(s.Text())
-	})
-
-	// Determine rating type for this section
-	rType := RatingTypeRegular
-	// locate section header table
-	parentTr := sel.Parent().Parent()
-	headerTr := parentTr.Prev()
-	headerTbl := headerTr.Find("table").First()
-	headerTbl.Find("td").Each(func(_ int, s *goquery.Selection) {
-		if strings.TrimSpace(s.Text()) == "Stats" {
-			// find next non-empty cell
-			nxt := s.Next()
-			for nxt.Length() > 0 && strings.TrimSpace(nxt.Text()) == "" {
-				nxt = nxt.Next()
-			}
-			txt := nxt.Text()
-			if idx := strings.Index(txt, "Rating Sys:"); idx != -1 {
-				val := strings.TrimSpace(txt[idx+len("Rating Sys:"):])
-				if len(val) > 0 {
-					switch val[0] {
-					case 'R', 'D':
-						rType = RatingTypeRegular
-					case 'B':
-						rType = RatingTypeBlitz
-					case 'Q':
-						rType = RatingTypeQuick
-					}
-				}
-			}
-		}
-	})
-
-	text := sel.Text()
-	lines := strings.Split(text, "\n")
-
-	// Locate header line and record '|' positions
-	headerIdx := -1
-	var separators []int
-	for ln, l := range lines {
-		if strings.Contains(l, "Pair") && strings.Contains(l, "|") {
-			headerIdx = ln
-			for idx, r := range l {
-				if r == '|' {
-					separators = append(separators, idx)
-				}
-			}
-			break
-		}
-	}
-	if headerIdx < 0 || len(separators) < 4 {
-		return nil
-	}
-
-	// Build column boundaries
-	boundaries := []int{-1}
-	boundaries = append(boundaries, separators...)
-	endPos := len(lines[headerIdx])
-	boundaries = append(boundaries, endPos)
-	numCols := len(boundaries) - 1
-
-	// Count rounds
-	numRounds := strings.Count(lines[headerIdx], "Round")
-	start := headerIdx + 2
-
-	entries := parseCrossTableEntries(start, numCols, lines, boundaries,
-		numRounds)
-
-	return &CrossTable{
-		SectionName:   sectionName,
-		NumRounds:     numRounds,
-		NumPlayers:    len(entries),
-		RType:         rType,
-		PlayerEntries: entries,
-	}
-}
-
-func parseCrossTableEntries(start, numCols int,
-	lines []string, boundaries []int, numRounds int) []CrossTableEntry {
-
-	// Prepare regexes
-	digitsRe := regexp.MustCompile(`\d+`)
-	dataLineRe := regexp.MustCompile(`^\s*\d+\s*\|`)
-	// Match playerID and pre->post ratings, capturing raw rating strings
-	idRe := regexp.MustCompile(`^(\d+)\s*/\s*[^:]+:\s*(.*?)\s*->\s*(.*?)$`)
-
-	var entries []CrossTableEntry
-	for j := start; j+1 < len(lines); j++ {
-		l1 := lines[j]
-		if strings.TrimSpace(l1) == "" ||
-			strings.HasPrefix(strings.TrimSpace(l1), "Note:") {
-			break
-		}
-		if !dataLineRe.MatchString(l1) {
-			continue
-		}
-		l2 := lines[j+1]
-
-		// Split fields by column boundaries
-		c1 := make([]string, numCols)
-		c2 := make([]string, numCols)
-		for k := 0; k < numCols; k++ {
-			sp := boundaries[k] + 1
-			ep := boundaries[k+1]
-			if sp < 0 {
-				sp = 0
-			}
-			if ep > len(l1) {
-				ep = len(l1)
-			}
-			c1[k] = strings.TrimSpace(l1[sp:ep])
-			if ep > len(l2) {
-				ep = len(l2)
-			}
-			c2[k] = strings.TrimSpace(l2[sp:ep])
-		}
-
-		// Extract player ID and ratings
-		m := idRe.FindStringSubmatch(c2[1])
-		if len(m) != 4 {
-			continue
-		}
-		// Player ID
-		playerID, _ := strconv.Atoi(m[1])
-		// Keep full rating strings including any provisional suffixes
-		preRating := strings.TrimSpace(m[2])
-		postRating := strings.TrimSpace(m[3])
-		totalPts, _ := strconv.ParseFloat(c1[2], 64)
-		pairNum, _ := strconv.Atoi(c1[0])
-		name := c1[1]
-
-		// Parse round results
-		var results []RoundResult
-		for r := 0; r < numRounds; r++ {
-			cellRes := strings.TrimSpace(c1[3+r])
-			cellCol := strings.TrimSpace(c2[3+r])
-			if cellRes == "" || !strings.ContainsAny(cellRes, "WLDUXFHB") {
-				results = append(results, RoundResult{Outcome: ResultUnknown})
-				continue
-			}
-			op := digitsRe.FindString(cellRes)
-			opNum, _ := strconv.Atoi(op)
-			var outcome Result
-			switch cellRes[0] {
-			case 'W':
-				outcome = ResultWin
-			case 'L':
-				outcome = ResultLoss
-			case 'D':
-				outcome = ResultDraw
-			case 'U':
-				outcome = ResultUnplayedGame
-			case 'X':
-				outcome = ResultWinByForfeit
-			case 'F':
-				outcome = ResultLossByForfeit
-			case 'H':
-				outcome = ResultHalfBye
-			case 'B':
-				outcome = ResultFullBye
-			default:
-				outcome = ResultUnknown
-			}
-			col := ""
-			if strings.ToUpper(cellCol) == "W" {
-				col = "white"
-			} else if strings.ToUpper(cellCol) == "B" {
-				col = "black"
-			}
-			results = append(results, RoundResult{OpponentPairNum: opNum,
-				Outcome: outcome, Color: col})
-		}
-
-		entries = append(entries, CrossTableEntry{
-			PairNum:          pairNum,
-			PlayerName:       internal.NormalizeName(name),
-			PlayerId:         MemID(playerID),
-			PlayerRatingPre:  preRating,
-			PlayerRatingPost: postRating,
-			TotalPoints:      totalPts,
-			Results:          results,
-		})
-	}
-
-	return entries
-}
-
 func BuildOneCrossTableOutput(xt *CrossTable,
-	includeSectionHeader bool, filterPlayerID MemID) string {
+	includeSectionHeader bool, filterPlayerID MemID) (string, string) {
 
 	// If filtering, determine which pair numbers to include (player + opponents)
 	var includeSet map[int]bool
@@ -569,6 +411,7 @@ func BuildOneCrossTableOutput(xt *CrossTable,
 	}
 
 	// Build rows
+	ratingPost := "<unknown>"
 	forfeitFound := false
 	var rows [][]string
 	for _, e := range xt.PlayerEntries {
@@ -581,6 +424,7 @@ func BuildOneCrossTableOutput(xt *CrossTable,
 			}
 			if filteredPlayerPairNum == e.PairNum {
 				playerName = fmt.Sprintf("**%v**", playerName)
+				ratingPost = e.PlayerRatingPost
 			}
 		}
 
@@ -653,5 +497,5 @@ func BuildOneCrossTableOutput(xt *CrossTable,
 	}
 	sb.WriteString("\n")
 
-	return sb.String()
+	return sb.String(), ratingPost
 }

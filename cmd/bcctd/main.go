@@ -232,7 +232,7 @@ func handleCrossTable(ctx context.Context, args []string) {
 	}
 
 	for _, xt := range t.CrossTables {
-		output := uschess.BuildOneCrossTableOutput(xt, len(t.CrossTables) > 1, 0)
+		output, _ := uschess.BuildOneCrossTableOutput(xt, len(t.CrossTables) > 1, 0)
 		fmt.Printf(output)
 	}
 }

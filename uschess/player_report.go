@@ -40,19 +40,6 @@ func buildPlayerReport(player *Player,
 	xTables map[EventID][]CrossTable,
 	eventCount int) string {
 
-	var sb strings.Builder
-
-	sb.WriteString(fmt.Sprintf("Player ID:%v:\n", player.MemberID))
-	sb.WriteString(fmt.Sprintf("Name: %v\n", player.Name))
-	sb.WriteString(fmt.Sprintf("Live Rating(reg): %v\n", player.RegRating))
-	sb.WriteString(fmt.Sprintf("Live Rating(quick): %v\n", player.QuickRating))
-	sb.WriteString(fmt.Sprintf("Live Rating(blitz): %v\n", player.BlitzRating))
-	sb.WriteString(fmt.Sprintf("Rated Events: %v\n", player.TotalEvents))
-	if len(xTables) > 0 {
-		sb.WriteString(fmt.Sprintf("Most Recent(%v) Classical Events:\n\n",
-			eventCount))
-	}
-
 	// Sort events by date
 	var eventIDs []EventID
 	for id := range xTables {
@@ -64,7 +51,9 @@ func buildPlayerReport(player *Player,
 		return evI.EndDate.After(evJ.EndDate)
 	})
 
+	var eventSB strings.Builder
 	outputCount := 0
+	firstEvent := true
 	for _, eventId := range eventIDs {
 		if outputCount >= eventCount {
 			break
@@ -80,15 +69,34 @@ func buildPlayerReport(player *Player,
 				continue
 			}
 			if firstTableInEvent {
-				sb.WriteString(fmt.Sprintf("%v - %v\n",
+				eventSB.WriteString(fmt.Sprintf("%v - %v\n",
 					event.EndDate.Format("2006-01-02"), event.Name))
 				outputCount++
 				firstTableInEvent = false
 			}
-			output := BuildOneCrossTableOutput(&xt, true, player.MemberID)
-			sb.WriteString(output)
+			output, postRtg := BuildOneCrossTableOutput(&xt, true,
+				player.MemberID)
+			if firstEvent {
+				player.RegRating = postRtg
+				firstEvent = false
+			}
+			eventSB.WriteString(output)
 		}
 	}
+
+	var sb strings.Builder
+
+	sb.WriteString(fmt.Sprintf("Player ID:%v:\n", player.MemberID))
+	sb.WriteString(fmt.Sprintf("Name: %v\n", player.Name))
+	sb.WriteString(fmt.Sprintf("Live Rating(reg): %v\n", player.RegRating))
+	sb.WriteString(fmt.Sprintf("Live Rating(quick): %v\n", player.QuickRating))
+	sb.WriteString(fmt.Sprintf("Live Rating(blitz): %v\n", player.BlitzRating))
+	sb.WriteString(fmt.Sprintf("Rated Events: %v\n", player.TotalEvents))
+	if len(xTables) > 0 {
+		sb.WriteString(fmt.Sprintf("Most Recent(%v) Classical Events:\n\n",
+			eventCount))
+	}
+	sb.WriteString(eventSB.String())
 
 	return sb.String()
 }

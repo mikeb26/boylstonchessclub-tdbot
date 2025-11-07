@@ -303,7 +303,7 @@ func tdCrossTableCmdHandler(ctx context.Context,
 		} else {
 			sectionList = fmt.Sprintf("%v, %v", sectionList, xt.SectionName)
 		}
-		output := uschess.BuildOneCrossTableOutput(xt, len(t.CrossTables) > 1, 0)
+		output, _ := uschess.BuildOneCrossTableOutput(xt, len(t.CrossTables) > 1, 0)
 		sb.WriteString(output)
 		sectionCount++
 	}
