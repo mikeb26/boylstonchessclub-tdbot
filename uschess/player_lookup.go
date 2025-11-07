@@ -14,6 +14,7 @@ import (
 	"strconv"
 
 	"github.com/mikeb26/boylstonchessclub-tdbot/internal"
+	"golang.org/x/sync/errgroup"
 )
 
 type MemID int
@@ -55,13 +56,24 @@ type apiEventsResponse struct {
 func (client *Client) FetchPlayer(ctx context.Context,
 	memberID MemID) (*Player, error) {
 
-	apiMember, err := client.fetchMemberProfile(ctx, memberID)
-	if err != nil {
-		return nil, err
-	}
+	var apiMember *apiMemberResponse
+	var apiMemberEvents *apiEventsResponse
 
-	apiMemberEvents, err := client.fetchMemberEvents(ctx, memberID)
-	if err != nil {
+	g, ctx := errgroup.WithContext(ctx)
+
+	g.Go(func() error {
+		var err error
+		apiMember, err = client.fetchMemberProfile(ctx, memberID)
+		return err
+	})
+
+	g.Go(func() error {
+		var err error
+		apiMemberEvents, err = client.fetchMemberEvents(ctx, memberID)
+		return err
+	})
+
+	if err := g.Wait(); err != nil {
 		return nil, err
 	}
 
