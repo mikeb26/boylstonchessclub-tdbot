@@ -33,12 +33,24 @@ type Player struct {
 
 // apiMemberResponse represents the JSON response from the member API endpoint
 type apiMemberResponse struct {
-	ID        string `json:"id"`
-	FirstName string `json:"firstName"`
-	LastName  string `json:"lastName"`
-	Ratings   []struct {
-		Rating       int    `json:"rating"`
-		RatingSystem string `json:"ratingSystem"`
+	ID            string `json:"id"`
+	FideID        string `json:"fideId"`
+	Gender        string `json:"gender"`
+	Rank          int    `json:"rank"`
+	StateRank     int    `json:"stateRank"`
+	FirstName     string `json:"firstName"`
+	LastName      string `json:"lastName"`
+	StateRep      string `json:"stateRep"`
+	Jurisdiction  string `json:"jurisdiction"`
+	MemStatus     string `json:"status"`
+	MemExpireDate string `json:"expirationDate"`
+	MemUpdated    string `json:"lastChangedDate"`
+	Ratings       []struct {
+		Rating        int    `json:"rating"`
+		RatingSystem  string `json:"ratingSystem"`
+		IsProvisional bool   `json:"isProvisional"`
+		GamesPlayed   int    `json:"gamesPlayed"`
+		Floor         int    `json:"floor"`
 	} `json:"ratings"`
 }
 
