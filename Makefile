@@ -22,6 +22,7 @@ test: build FORCE
 	go test github.com/mikeb26/boylstonchessclub-tdbot/bcc
 	go test github.com/mikeb26/boylstonchessclub-tdbot/uschess
 	go test github.com/mikeb26/boylstonchessclub-tdbot/internal
+	go test github.com/mikeb26/boylstonchessclub-tdbot/internal/httpcache
 	go test github.com/mikeb26/boylstonchessclub-tdbot/s3cache
 
 .PHONY: deps
