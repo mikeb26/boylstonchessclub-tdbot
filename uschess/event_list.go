@@ -2,14 +2,14 @@ package uschess
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
-	"log"
+	"io"
 	"net/http"
+	"net/url"
 	"strconv"
-	"strings"
 	"time"
 
-	"github.com/PuerkitoBio/goquery"
 	"github.com/mikeb26/boylstonchessclub-tdbot/internal"
 )
 
@@ -21,76 +21,83 @@ type Event struct {
 	ID      EventID
 }
 
+type apiAffiliateEventsResponse struct {
+	Items []struct {
+		ID      string `json:"id"`
+		Name    string `json:"name"`
+		EndDate string `json:"endDate"`
+	} `json:"items"`
+	Offset      int  `json:"offset"`
+	PageSize    int  `json:"pageSize"`
+	HasNextPage bool `json:"hasNextPage"`
+	HasPrevPage bool `json:"hasPreviousPage"`
+}
+
 // GetAffiliateEvents fetches and parses the Affiliate Tournament History page
 // for the given affiliate code and returns a slice of Event.
 func (client *Client) GetAffiliateEvents(ctx context.Context,
 	affiliateCode string) ([]Event, error) {
-
-	url := fmt.Sprintf("https://www.uschess.org/msa/AffDtlTnmtHst.php?%s",
-		affiliateCode)
-
-	req, err := http.NewRequest("GET", url, nil)
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("User-Agent", internal.UserAgent)
-
-	resp, err := client.httpClient1day.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("HTTP %d fetching %s", resp.StatusCode, url)
-	}
-
-	doc, err := goquery.NewDocumentFromReader(resp.Body)
+	apiBase, err := url.Parse("https://ratings-api.uschess.org")
 	if err != nil {
 		return nil, err
 	}
 
 	var events []Event
+	const pageSize = 100
+	offset := 0
 
-	// Find the main events table
-	table := doc.Find("table[width='750'][border='1']").First()
+	for {
+		eventsURL := apiBase.ResolveReference(&url.URL{Path: "/api/v1/affiliates/" + url.PathEscape(affiliateCode) + "/events"})
+		q := eventsURL.Query()
+		q.Set("offset", strconv.Itoa(offset))
+		q.Set("pageSize", strconv.Itoa(pageSize))
+		eventsURL.RawQuery = q.Encode()
 
-	// Iterate each row in the table
-	table.Find("tr").Each(func(_ int, row *goquery.Selection) {
-		dateTd := row.Find("td[width='120']")
-		if dateTd.Length() == 0 {
-			return // not an event row
-		}
-
-		// Extract end date (text node before <small>)
-		endDateStr := dateTd.Contents().FilterFunction(func(i int, s *goquery.Selection) bool {
-			return goquery.NodeName(s) == "#text"
-		}).Text()
-		endDateStr = strings.TrimSpace(endDateStr)
-
-		// Extract event ID from <small>
-		id := strings.TrimSpace(dateTd.Find("small").Text())
-		idInt, err := strconv.Atoi(id)
+		eventsReq, err := http.NewRequestWithContext(ctx, "GET", eventsURL.String(), nil)
 		if err != nil {
-			// skip events with invalid ID
-			return
+			return nil, err
 		}
+		eventsReq.Header.Set("User-Agent", internal.UserAgent)
+		eventsReq.Header.Set("Accept", "application/json")
 
-		// Extract event name from the link in the second cell
-		name := strings.TrimSpace(row.Find("td").Eq(1).Find("a").Text())
-
-		endDate, err := internal.ParseDateOrZero(endDateStr)
+		eventsResp, err := client.httpClient1day.Do(eventsReq)
 		if err != nil {
-			log.Printf("*warning: unable to parse date %v for event %v\n",
-				endDateStr, id)
-			endDate = time.Time{}
+			return nil, err
 		}
-		events = append(events, Event{
-			EndDate: endDate,
-			Name:    name,
-			ID:      EventID(idInt),
-		})
-	})
+		respBody, readErr := io.ReadAll(eventsResp.Body)
+		eventsResp.Body.Close()
+		if readErr != nil {
+			return nil, readErr
+		}
+
+		if eventsResp.StatusCode != http.StatusOK {
+			return nil, fmt.Errorf("HTTP %d fetching %s: %s", eventsResp.StatusCode, eventsURL.String(), string(respBody))
+		}
+
+		var eventsData apiAffiliateEventsResponse
+		if err := json.Unmarshal(respBody, &eventsData); err != nil {
+			return nil, fmt.Errorf("decoding affiliate events JSON from %s: %w", eventsURL.String(), err)
+		}
+
+		for _, item := range eventsData.Items {
+			idInt, err := strconv.Atoi(item.ID)
+			if err != nil {
+				// Skip events with invalid IDs
+				continue
+			}
+			endDate, _ := internal.ParseDateOrZero(item.EndDate)
+			events = append(events, Event{
+				EndDate: endDate,
+				Name:    item.Name,
+				ID:      EventID(idInt),
+			})
+		}
+
+		if !eventsData.HasNextPage {
+			break
+		}
+		offset += pageSize
+	}
 
 	return events, nil
 }
