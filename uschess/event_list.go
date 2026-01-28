@@ -1,3 +1,7 @@
+/* Copyright © 2025 Mike Brown. All Rights Reserved.
+ *
+ * See LICENSE file at the root of this repository for license terms
+ */
 package uschess
 
 import (

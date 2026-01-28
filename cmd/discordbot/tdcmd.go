@@ -1,4 +1,4 @@
-/* Copyright © 2025 Mike Brown. All Rights Reserved.
+/* Copyright © 2025-2026 Mike Brown. All Rights Reserved.
  *
  * See LICENSE file at the root of this repository for license terms
  */
@@ -10,8 +10,10 @@ import (
 	"fmt"
 	"log"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/bwmarrin/discordgo"
 
@@ -31,6 +33,7 @@ const (
 	TdStandingsCmd  TdSubCommand = "standings"
 	TdPlayerCmd     TdSubCommand = "player"
 	TdCrossTableCmd TdSubCommand = "crosstable"
+	TdEstRatingCmd  TdSubCommand = "estrating"
 )
 
 var tdSubCmdHdlrs = map[TdSubCommand]CmdHandler{
@@ -43,6 +46,7 @@ var tdSubCmdHdlrs = map[TdSubCommand]CmdHandler{
 	TdStandingsCmd:  tdStandingsCmdHandler,
 	TdPlayerCmd:     tdPlayerCmdHandler,
 	TdCrossTableCmd: tdCrossTableCmdHandler,
+	TdEstRatingCmd:  tdEstRatingCmdHandler,
 }
 
 func tdCmdHandler(ctx context.Context,
@@ -557,4 +561,100 @@ func truncateContent(s string) (string, bool) {
 		truncated = true
 	}
 	return s, truncated
+}
+
+func parseMemIDList(s string) ([]uschess.MemID, error) {
+	fields := strings.FieldsFunc(s, func(r rune) bool {
+		return r == ',' || unicode.IsSpace(r)
+	})
+
+	ids := make([]uschess.MemID, 0, len(fields))
+	for _, f := range fields {
+		f = strings.TrimSpace(f)
+		if f == "" {
+			continue
+		}
+		v, err := strconv.ParseInt(f, 10, 32)
+		if err != nil {
+			return nil, fmt.Errorf("invalid USCF member id %q", f)
+		}
+		if v <= 0 {
+			return nil, fmt.Errorf("invalid USCF member id %q", f)
+		}
+		ids = append(ids, uschess.MemID(v))
+	}
+
+	return ids, nil
+}
+
+// tdEstRatingCmdHandler handles the /td estrating command to display an estimate
+// of the player's new rating after a tournament is scored
+func tdEstRatingCmdHandler(ctx context.Context,
+	inter *discordgo.Interaction) *discordgo.InteractionResponse {
+	resp := &discordgo.InteractionResponse{
+		Type: discordgo.InteractionResponseChannelMessageWithSource,
+		Data: &discordgo.InteractionResponseData{
+			Flags: discordgo.MessageFlagsEphemeral,
+		},
+	}
+
+	data := inter.ApplicationCommandData()
+	broadcast := false // default
+	var score float64
+	var memID int64
+	opponentsText := ""
+
+	if len(data.Options) > 0 {
+		for _, opt := range data.Options[0].Options {
+			switch opt.Name {
+			case "score":
+				score = opt.FloatValue()
+			case "memid":
+				memID = opt.IntValue()
+			case "opponents":
+				opponentsText = opt.StringValue()
+			case "broadcast":
+				broadcast = opt.BoolValue()
+			}
+		}
+	}
+
+	if memID <= 0 {
+		resp.Data.Content = "Please provide a USCF member ID."
+		log.Printf("discordbot.estrating: %v", resp.Data.Content)
+		return resp
+	}
+	if score < 0 {
+		resp.Data.Content = "Please provide a valid score (must be >= 0)."
+		log.Printf("discordbot.estrating: %v", resp.Data.Content)
+		return resp
+	}
+
+	opponentIDs, err := parseMemIDList(opponentsText)
+	if err != nil {
+		resp.Data.Content = fmt.Sprintf("Invalid opponents list: %v", err)
+		log.Printf("discordbot.estrating: %v", resp.Data.Content)
+		return resp
+	}
+	if len(opponentIDs) == 0 {
+		resp.Data.Content = "Please provide at least one opponent USCF member ID (space and/or comma separated)."
+		log.Printf("discordbot.estrating: %v", resp.Data.Content)
+		return resp
+	}
+
+	newRating, err := uschessClient.GetRatingEstimate(ctx,
+		uschess.MemID(memID), opponentIDs, score)
+	if err != nil {
+		resp.Data.Content = fmt.Sprintf("Failed to estimate rating: %v", err)
+		log.Printf("discordbot.estrating: %v", resp.Data.Content)
+		return resp
+	}
+
+	resp.Data.Content = fmt.Sprintf("Estimated New Rating: %v", int(newRating))
+
+	if broadcast {
+		resp.Data.Flags = 0
+	}
+
+	return resp
 }

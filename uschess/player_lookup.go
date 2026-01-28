@@ -1,4 +1,4 @@
-/* Copyright © 2025 Mike Brown. All Rights Reserved.
+/* Copyright © 2025-2026 Mike Brown. All Rights Reserved.
  *
  * See LICENSE file at the root of this repository for license terms
  */
@@ -173,17 +173,34 @@ func apiMemberToPlayer(memberID MemID, memberData *apiMemberResponse) *Player {
 
 	// Extract ratings
 	for _, rating := range memberData.Ratings {
-		if rating.Rating == 0 {
-			continue
-		}
-		ratingStr := strconv.Itoa(rating.Rating)
 		switch rating.RatingSystem {
 		case "R":
-			player.RegRating = ratingStr
+			if rating.Rating != 0 {
+				if rating.IsProvisional {
+					player.RegRating = fmt.Sprintf("%vP%v", rating.Rating,
+						rating.GamesPlayed)
+				} else {
+					player.RegRating = strconv.Itoa(rating.Rating)
+				}
+			}
 		case "Q":
-			player.QuickRating = ratingStr
+			if rating.Rating != 0 {
+				if rating.IsProvisional {
+					player.QuickRating = fmt.Sprintf("%vP%v", rating.Rating,
+						rating.GamesPlayed)
+				} else {
+					player.QuickRating = strconv.Itoa(rating.Rating)
+				}
+			}
 		case "B":
-			player.BlitzRating = ratingStr
+			if rating.Rating != 0 {
+				if rating.IsProvisional {
+					player.BlitzRating = fmt.Sprintf("%vP%v", rating.Rating,
+						rating.GamesPlayed)
+				} else {
+					player.BlitzRating = strconv.Itoa(rating.Rating)
+				}
+			}
 		}
 	}
 

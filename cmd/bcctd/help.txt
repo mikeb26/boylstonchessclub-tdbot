@@ -34,8 +34,12 @@ Available Commands:
                          Chess Club) over the specified last number
 			 of days (14 by default if not specified).
 
-  bcctd player [--eventcount <numberOfEvents>] [--id <USCF member id>]
+  bcctd player --id <USCF member id> [--eventcount <numberOfEvents>]
                          Display information about a player given
                          their USCF member id. Additionally, retrieve
                          cross tables for the player's most recent
                          numberOfEvents (default is 1).
+
+  bcctd estrating --id <USCF member id> --score <score> [<Opponent USCF member ids>]
+                         Estimate new rating based on score and a list
+			 of opponent ids.

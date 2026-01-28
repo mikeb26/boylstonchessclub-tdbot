@@ -1,4 +1,4 @@
-/* Copyright © 2025 Mike Brown. All Rights Reserved.
+/* Copyright © 2025-2026 Mike Brown. All Rights Reserved.
  *
  * See LICENSE file at the root of this repository for license terms
  */
@@ -305,6 +305,37 @@ func registerSlashCommands() {
 						Type:        discordgo.ApplicationCommandOptionBoolean,
 						Name:        "broadcast",
 						Description: "Share with the rest of the channel instead of	only to you (default is false)",
+						Required:    false,
+					},
+				},
+			},
+			{
+				Type:        discordgo.ApplicationCommandOptionSubCommand,
+				Name:        string(TdEstRatingCmd),
+				Description: "Estimate a player's post-event Regular rating given score and opponent IDs",
+				Options: []*discordgo.ApplicationCommandOption{
+					{
+						Type:        discordgo.ApplicationCommandOptionNumber,
+						Name:        "score",
+						Description: "Your total score in the event (e.g. 3.5)",
+						Required:    true,
+					},
+					{
+						Type:        discordgo.ApplicationCommandOptionInteger,
+						Name:        "memid",
+						Description: "Your USCF member id",
+						Required:    true,
+					},
+					{
+						Type:        discordgo.ApplicationCommandOptionString,
+						Name:        "opponents",
+						Description: "Opponent USCF member ids (space and/or comma separated)",
+						Required:    true,
+					},
+					{
+						Type:        discordgo.ApplicationCommandOptionBoolean,
+						Name:        "broadcast",
+						Description: "Share with the rest of the channel instead of\tonly to you (default is false)",
 						Required:    false,
 					},
 				},

@@ -15,8 +15,8 @@ Available Commands:
 
   /td crosstable eventid: <eventId> [section: <sectionName>] [broadcast: <true|false>]
                          Display crosstables for a completed tournament. To show only a
-						 single section also specify the section name. To share with the
-						 channel set broadcast: true (false by default).
+                         single section also specify the section name. To share with the
+                         channel set broadcast: true (false by default).
 
   /td entries eventid: <eventId> [broadcast: <true|false>]
                          Display current entries for a tournament,
@@ -37,6 +37,13 @@ Available Commands:
                          Display information on a specific player
                          given their USCF member id. To share with the
                          channel set broadcast: true (false by
+                         default).
+
+  /td estrating score: <score> memid: <memberId> opponents: <idList> [broadcast: <true|false>]
+                         Estimate a player's post-event Regular rating given their
+                         score and a list of opponent USCF member ids. The
+                         opponents list should be space and/or comma separated.
+                         To share with the channel set broadcast: true (false by
                          default).
 
   /td standings eventid: <eventId> [broadcast: <true|false>]

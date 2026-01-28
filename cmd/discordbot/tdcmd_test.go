@@ -1,4 +1,4 @@
-/* Copyright © 2025 Mike Brown. All Rights Reserved.
+/* Copyright © 2025-2026 Mike Brown. All Rights Reserved.
  *
  * See LICENSE file at the root of this repository for license terms
  */
@@ -82,5 +82,15 @@ func TestTdEventCmdHandler(t *testing.T) {
 	// Expect that the event title 'Big Money Swiss' appears in the output
 	if !strings.Contains(title, "Big Money Swiss") {
 		t.Errorf("Expected response content to contain 'Big Money Swiss', got %q", title)
+	}
+}
+
+func TestParseMemIDList(t *testing.T) {
+	ids, err := parseMemIDList("  123, 456   789\n")
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	if len(ids) != 3 {
+		t.Fatalf("expected 3 ids, got %v", len(ids))
 	}
 }

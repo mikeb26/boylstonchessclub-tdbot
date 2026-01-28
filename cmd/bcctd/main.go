@@ -1,4 +1,4 @@
-/* Copyright © 2025 Mike Brown. All Rights Reserved.
+/* Copyright © 2025-2026 Mike Brown. All Rights Reserved.
  *
  * See LICENSE file at the root of this repository for license terms
  */
@@ -12,6 +12,7 @@ import (
 	"log"
 	"os"
 	"sort"
+	"strconv"
 	"time"
 
 	"github.com/mikeb26/boylstonchessclub-tdbot/bcc"
@@ -36,6 +37,7 @@ var commands = map[string]cmdHandler{
 	"crosstable": handleCrossTable,
 	"history":    handleHistory,
 	"player":     handlePlayer,
+	"estrating":  handleEstRating,
 }
 
 var uschessClient *uschess.Client
@@ -326,4 +328,42 @@ func handlePlayer(ctx context.Context, args []string) {
 	}
 
 	fmt.Printf("%v", report)
+}
+
+func handleEstRating(ctx context.Context, args []string) {
+	fs := flag.NewFlagSet("estrating", flag.ExitOnError)
+	score := fs.Float64("score", 0, "Score")
+	memberID := fs.Int("id", 0, "USCF member id")
+	if err := fs.Parse(args); err != nil {
+		os.Exit(1)
+	}
+	if *score == 0.0 {
+		fmt.Fprintln(os.Stderr, "Please provide a valid --score <score>")
+		fs.Usage()
+		os.Exit(1)
+	}
+	if *memberID == 0 {
+		fmt.Fprintln(os.Stderr, "Please provide a valid --id <USCF member id>")
+		fs.Usage()
+		os.Exit(1)
+	}
+
+	// collect opponent USCF ids
+	opponentIds := make([]uschess.MemID, 0)
+	for _, oppUscfId := range fs.Args() {
+		var r int64
+		r, err := strconv.ParseInt(oppUscfId, 10, 64)
+		if err != nil {
+			log.Fatalf("Failed to parse opponent USCF id '%v': %v\n", oppUscfId,
+				err)
+		}
+		opponentIds = append(opponentIds, uschess.MemID(r))
+	}
+
+	newRating, err := uschessClient.GetRatingEstimate(ctx,
+		uschess.MemID(*memberID), opponentIds, *score)
+	if err != nil {
+		log.Fatalf("Failed to estimate: %v\n", err)
+	}
+	fmt.Printf("Estimated New Rating: %v\n", int(newRating))
 }
