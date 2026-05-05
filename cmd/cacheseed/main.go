@@ -24,7 +24,7 @@ func main() {
 	uschessClient = uschess.NewClient(context.Background())
 
 	for _, memId := range bcc.ActivePlayerMemIds() {
-		player, err := uschessClient.FetchPlayer(ctx, memId)
+		player, err := uschessClient.FetchPlayer(ctx, memId, true)
 		time.Sleep(2 * time.Second) // avoid pegging uschess.org
 		if err != nil {
 			// best effort

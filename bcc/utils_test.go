@@ -29,6 +29,12 @@ func TestEntryToPlayer(t *testing.T) {
 			wantSR: 1600,
 		},
 		{
+			name:   "provisional ratings",
+			entry:  Entry{FirstName: "Provisional", LastName: "Player", PrimaryRating: "1654P11", SecondaryRating: "1200P4"},
+			wantPR: 1654,
+			wantSR: 1200,
+		},
+		{
 			name:   "empty ratings",
 			entry:  Entry{FirstName: "Empty", LastName: "Ratings"},
 			wantPR: 0,

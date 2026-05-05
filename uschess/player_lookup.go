@@ -87,7 +87,7 @@ type apiRatingSupplementsResponse struct {
 // FetchPlayer retrieves player information for the given USCF member ID using
 // the ratings API (https://ratings-api.uschess.org/api/v1/members/).
 func (client *Client) FetchPlayer(ctx context.Context,
-	memberID MemID) (*Player, error) {
+	memberID MemID, fetchEvents bool) (*Player, error) {
 
 	var apiMember *apiMemberResponse
 	var apiMemberEvents *apiEventsResponse
@@ -101,11 +101,13 @@ func (client *Client) FetchPlayer(ctx context.Context,
 		return err
 	})
 
-	g.Go(func() error {
-		var err error
-		apiMemberEvents, err = client.fetchMemberEvents(ctx, memberID)
-		return err
-	})
+	if fetchEvents {
+		g.Go(func() error {
+			var err error
+			apiMemberEvents, err = client.fetchMemberEvents(ctx, memberID)
+			return err
+		})
+	}
 
 	g.Go(func() error {
 		var err error
@@ -119,7 +121,9 @@ func (client *Client) FetchPlayer(ctx context.Context,
 	}
 
 	player := apiMemberToPlayer(memberID, apiMember)
-	addApiMemberEventsToPlayer(player, apiMemberEvents)
+	if fetchEvents {
+		addApiMemberEventsToPlayer(player, apiMemberEvents)
+	}
 	addApiRatingSupplementsToPlayer(player, apiRatingSupplements)
 
 	return player, nil
@@ -131,7 +135,7 @@ func (client *Client) fetchMemberProfile(ctx context.Context,
 	profileEndpoint :=
 		fmt.Sprintf("https://ratings-api.uschess.org/api/v1/members/%v",
 			memberID)
-	req, err := http.NewRequest("GET", profileEndpoint, nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", profileEndpoint, nil)
 	if err != nil {
 		return nil, fmt.Errorf("creating profile request: %w", err)
 	}
@@ -164,7 +168,7 @@ func (client *Client) fetchMemberEvents(ctx context.Context,
 	eventsEndpoint :=
 		fmt.Sprintf("https://ratings-api.uschess.org/api/v1/members/%v/events",
 			memberID)
-	eventsReq, err := http.NewRequest("GET", eventsEndpoint, nil)
+	eventsReq, err := http.NewRequestWithContext(ctx, "GET", eventsEndpoint, nil)
 	if err != nil {
 		return nil, fmt.Errorf("creating events request: %w", err)
 	}

@@ -19,7 +19,7 @@ import (
 func (client *Client) GetPlayerReport(ctx context.Context, memberID MemID,
 	eventCount int) (string, error) {
 
-	player, err := client.FetchPlayer(ctx, memberID)
+	player, err := client.FetchPlayer(ctx, memberID, eventCount > 0)
 	if err != nil {
 		return "", err
 	}

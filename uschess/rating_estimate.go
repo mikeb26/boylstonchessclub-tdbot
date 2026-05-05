@@ -230,7 +230,7 @@ func regRatingFloat(p *Player) (float64, error) {
 func (client *Client) fetchOneRatedPlayer(ctx context.Context,
 	playerID MemID) (*Player, error) {
 
-	p, err := client.FetchPlayer(ctx, playerID)
+	p, err := client.FetchPlayer(ctx, playerID, true)
 	if err != nil {
 		return nil, err
 	}

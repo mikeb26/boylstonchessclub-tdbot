@@ -5,11 +5,24 @@
 package bcc
 
 import (
+	"context"
 	"regexp"
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
+	"time"
+
+	"github.com/mikeb26/boylstonchessclub-tdbot/uschess"
 )
+
+const (
+	round1PairingCorrectionConcurrency = 8
+	round1PairingCorrectionTimeout     = 30 * time.Second
+)
+
+type uschessRatingProfileLookup func(context.Context,
+	uschess.MemID, bool) (*uschess.Player, error)
 
 type section struct {
 	Players  []Entry
@@ -32,6 +45,114 @@ func predictRound1Pairings(entries []Entry) []Pairing {
 	}
 
 	return pairings
+}
+
+func correctRound1PairingEntries(entries []Entry) []Entry {
+	ctx, cancel := context.WithTimeout(context.Background(),
+		round1PairingCorrectionTimeout)
+	defer cancel()
+
+	client := uschess.NewClient(ctx)
+	return correctRound1PairingEntriesWithLookup(ctx, entries,
+		client.FetchPlayer)
+}
+
+func correctRound1PairingEntriesWithLookup(ctx context.Context, entries []Entry,
+	lookup uschessRatingProfileLookup) []Entry {
+
+	corrected := make([]Entry, len(entries))
+	copy(corrected, entries)
+
+	if lookup == nil {
+		return corrected
+	}
+
+	var wg sync.WaitGroup
+	var mu sync.Mutex
+	sem := make(chan struct{}, round1PairingCorrectionConcurrency)
+
+	for idx, entry := range entries {
+		if entry.UscfID <= 0 {
+			continue
+		}
+
+		idx, entry := idx, entry
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+
+			select {
+			case sem <- struct{}{}:
+				defer func() { <-sem }()
+			case <-ctx.Done():
+				return
+			}
+
+			player, err := lookup(ctx, uschess.MemID(entry.UscfID), false)
+			if err != nil {
+				return
+			}
+
+			updated, ok := applyUSChessRound1Correction(entry, player)
+			if !ok {
+				return
+			}
+
+			mu.Lock()
+			corrected[idx] = updated
+			mu.Unlock()
+		}()
+	}
+
+	wg.Wait()
+
+	return corrected
+}
+
+func applyUSChessRound1Correction(entry Entry, player *uschess.Player) (Entry,
+	bool) {
+
+	if player == nil || player.MemberID == 0 {
+		return entry, false
+	}
+
+	rating := strings.TrimSpace(player.RegSupplement.Rating)
+	if !isUsableSupplementRating(rating) {
+		return entry, false
+	}
+
+	entry.PrimaryRating = rating
+	entry.PrimaryRatingType = "regular"
+	if !player.RegSupplement.Date.IsZero() {
+		entry.PrimaryRatingDate = player.RegSupplement.Date.Format("2006-01-02")
+	}
+
+	firstName, lastName := splitUSChessPlayerName(player.Name)
+	if firstName != "" {
+		entry.FirstName = firstName
+	}
+	if lastName != "" {
+		entry.LastName = lastName
+	}
+
+	return entry, true
+}
+
+func isUsableSupplementRating(rating string) bool {
+	rating = strings.TrimSpace(rating)
+	return rating != "" && rating != "<unrated>" && strRatingToInt(rating) > 0
+}
+
+func splitUSChessPlayerName(name string) (string, string) {
+	parts := strings.Fields(strings.TrimSpace(name))
+	if len(parts) == 0 {
+		return "", ""
+	}
+	if len(parts) == 1 {
+		return parts[0], ""
+	}
+
+	return parts[0], strings.Join(parts[1:], " ")
 }
 
 func buildSections(entries []Entry) map[string]section {

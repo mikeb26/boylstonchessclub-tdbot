@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"unicode"
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/mikeb26/boylstonchessclub-tdbot/internal"
@@ -68,11 +69,19 @@ func entryToPlayer(entry Entry) Player {
 func strRatingToInt(rating string) int {
 	r := 0
 	if rating != "" {
+		rating = strings.TrimSpace(rating)
 		// handle formats like "559/24"
 		if idx := strings.Index(rating, "/"); idx != -1 {
 			rating = rating[:idx]
 		}
-		if v, err := strconv.Atoi(strings.TrimSpace(rating)); err == nil {
+		// handle provisional formats like "1654P11"
+		for idx, c := range rating {
+			if !unicode.IsDigit(c) {
+				rating = rating[:idx]
+				break
+			}
+		}
+		if v, err := strconv.Atoi(rating); err == nil {
 			r = v
 		}
 	}
