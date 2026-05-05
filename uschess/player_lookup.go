@@ -10,8 +10,10 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"sort"
 	"strconv"
+	"time"
 
 	"github.com/mikeb26/boylstonchessclub-tdbot/internal"
 	"golang.org/x/sync/errgroup"
@@ -21,14 +23,22 @@ type MemID int
 
 // Player holds information about a USCF member.
 type Player struct {
-	MemberID    MemID
-	Name        string
-	RegRating   string
-	QuickRating string
-	BlitzRating string
-	TotalEvents int
+	MemberID        MemID
+	Name            string
+	RegRating       string
+	QuickRating     string
+	BlitzRating     string
+	RegSupplement   RatingSupplement
+	QuickSupplement RatingSupplement
+	BlitzSupplement RatingSupplement
+	TotalEvents     int
 	// up to 50
 	RecentEvents []Event
+}
+
+type RatingSupplement struct {
+	Rating string
+	Date   time.Time
 }
 
 // apiMemberResponse represents the JSON response from the member API endpoint
@@ -63,6 +73,17 @@ type apiEventsResponse struct {
 	} `json:"items"`
 }
 
+type apiRatingSupplementsResponse struct {
+	Items []struct {
+		RatingSupplementDate string `json:"ratingSupplementDate"`
+		Ratings              []struct {
+			Source               string `json:"source"`
+			Rating               *int   `json:"rating"`
+			ProvisionalGameCount *int   `json:"provisionalGameCount"`
+		} `json:"ratings"`
+	} `json:"items"`
+}
+
 // FetchPlayer retrieves player information for the given USCF member ID using
 // the ratings API (https://ratings-api.uschess.org/api/v1/members/).
 func (client *Client) FetchPlayer(ctx context.Context,
@@ -70,6 +91,7 @@ func (client *Client) FetchPlayer(ctx context.Context,
 
 	var apiMember *apiMemberResponse
 	var apiMemberEvents *apiEventsResponse
+	var apiRatingSupplements *apiRatingSupplementsResponse
 
 	g, ctx := errgroup.WithContext(ctx)
 
@@ -85,12 +107,20 @@ func (client *Client) FetchPlayer(ctx context.Context,
 		return err
 	})
 
+	g.Go(func() error {
+		var err error
+		apiRatingSupplements, err = client.fetchMemberRatingSupplements(ctx,
+			memberID)
+		return err
+	})
+
 	if err := g.Wait(); err != nil {
 		return nil, err
 	}
 
 	player := apiMemberToPlayer(memberID, apiMember)
 	addApiMemberEventsToPlayer(player, apiMemberEvents)
+	addApiRatingSupplementsToPlayer(player, apiRatingSupplements)
 
 	return player, nil
 }
@@ -161,6 +191,46 @@ func (client *Client) fetchMemberEvents(ctx context.Context,
 	return &eventsData, nil
 }
 
+func (client *Client) fetchMemberRatingSupplements(ctx context.Context,
+	memberID MemID) (*apiRatingSupplementsResponse, error) {
+
+	supplementsURL, err := url.Parse(fmt.Sprintf("https://ratings-api.uschess.org/api/v1/members/%v/rating-supplements",
+		memberID))
+	if err != nil {
+		return nil, fmt.Errorf("parsing rating supplements URL: %w", err)
+	}
+	q := supplementsURL.Query()
+	q.Set("Size", "1")
+	supplementsURL.RawQuery = q.Encode()
+
+	req, err := http.NewRequestWithContext(ctx, "GET",
+		supplementsURL.String(), nil)
+	if err != nil {
+		return nil, fmt.Errorf("creating rating supplements request: %w", err)
+	}
+	req.Header.Set("User-Agent", internal.UserAgent)
+	req.Header.Set("Accept", "application/json")
+
+	resp, err := client.httpClient1day.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("performing rating supplements HTTP GET: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("unexpected rating supplements status %d: %s",
+			resp.StatusCode, string(body))
+	}
+
+	var supplementsData apiRatingSupplementsResponse
+	if err := json.NewDecoder(resp.Body).Decode(&supplementsData); err != nil {
+		return nil, fmt.Errorf("decoding rating supplements JSON: %w", err)
+	}
+
+	return &supplementsData, nil
+}
+
 func apiMemberToPlayer(memberID MemID, memberData *apiMemberResponse) *Player {
 	player := &Player{
 		MemberID: memberID,
@@ -205,6 +275,46 @@ func apiMemberToPlayer(memberID MemID, memberData *apiMemberResponse) *Player {
 	}
 
 	return player
+}
+
+func addApiRatingSupplementsToPlayer(player *Player,
+	supplementsData *apiRatingSupplementsResponse) {
+
+	if supplementsData == nil || len(supplementsData.Items) == 0 {
+		return
+	}
+
+	latest := supplementsData.Items[0]
+	supplementDate, err := internal.ParseDateOrZero(latest.RatingSupplementDate)
+	if err != nil {
+		return
+	}
+
+	for _, rating := range latest.Ratings {
+		supplement := RatingSupplement{
+			Rating: formatRating(rating.Rating, rating.ProvisionalGameCount),
+			Date:   supplementDate,
+		}
+
+		switch rating.Source {
+		case "R":
+			player.RegSupplement = supplement
+		case "Q":
+			player.QuickSupplement = supplement
+		case "B":
+			player.BlitzSupplement = supplement
+		}
+	}
+}
+
+func formatRating(rating *int, provisionalGameCount *int) string {
+	if rating == nil || *rating == 0 {
+		return "<unrated>"
+	}
+	if provisionalGameCount != nil {
+		return fmt.Sprintf("%vP%v", *rating, *provisionalGameCount)
+	}
+	return strconv.Itoa(*rating)
 }
 
 func addApiMemberEventsToPlayer(player *Player, eventsData *apiEventsResponse) {

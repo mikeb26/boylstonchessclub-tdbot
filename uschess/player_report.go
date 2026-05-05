@@ -86,11 +86,12 @@ func buildPlayerReport(player *Player,
 
 	var sb strings.Builder
 
-	sb.WriteString(fmt.Sprintf("Player ID:%v:\n", player.MemberID))
-	sb.WriteString(fmt.Sprintf("Name: %v\n", player.Name))
-	sb.WriteString(fmt.Sprintf("Live Rating(reg): %v\n", player.RegRating))
-	sb.WriteString(fmt.Sprintf("Live Rating(quick): %v\n", player.QuickRating))
-	sb.WriteString(fmt.Sprintf("Live Rating(blitz): %v\n", player.BlitzRating))
+	sb.WriteString(fmt.Sprintf("Player: %v\n", player.Name))
+	sb.WriteString(fmt.Sprintf("USCF ID: %v\n", player.MemberID))
+	sb.WriteString(fmt.Sprintf("Rating:\n\tLive: %v\n", player.RegRating))
+	sb.WriteString(fmt.Sprintf("\t%s Supplement: %s\n",
+		player.RegSupplement.Date.Format("Jan"),
+		player.RegSupplement.Rating))
 	sb.WriteString(fmt.Sprintf("Rated Events: %v\n", player.TotalEvents))
 	if len(xTables) > 0 {
 		sb.WriteString(fmt.Sprintf("Most Recent(%v) Classical Events:\n\n",
