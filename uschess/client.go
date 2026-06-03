@@ -18,14 +18,14 @@ type Client struct {
 }
 
 func NewClient(ctx context.Context) *Client {
-	ret := &Client{
-		httpClient30day: httpcache.NewCachedHttpClient(ctx, 30*24*time.Hour),
-	}
-	if ret.httpClient30day != http.DefaultClient {
-		ret.httpClient1day = httpcache.NewCachedHttpClient(ctx, 24*time.Hour)
-	} else {
-		ret.httpClient1day = http.DefaultClient
+	base30day := httpcache.NewCachedHttpClient(ctx, 30*24*time.Hour)
+	base1day := http.DefaultClient
+	if base30day != http.DefaultClient {
+		base1day = httpcache.NewCachedHttpClient(ctx, 24*time.Hour)
 	}
 
-	return ret
+	return &Client{
+		httpClient30day: newRetryingClient(base30day),
+		httpClient1day:  newRetryingClient(base1day),
+	}
 }
