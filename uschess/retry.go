@@ -8,16 +8,18 @@ import (
 	"context"
 	"errors"
 	"io"
+	"math/rand"
 	"net"
 	"net/http"
 	"strconv"
+	"sync"
 	"time"
 )
 
 const (
 	defaultMaxAttempts = 4
-	defaultBaseDelay   = 250 * time.Millisecond
-	defaultMaxDelay    = 5 * time.Second
+	defaultBaseDelay   = 1 * time.Second
+	defaultMaxDelay    = 30 * time.Second
 )
 
 func newRetryingClient(base *http.Client) *http.Client {
@@ -37,6 +39,7 @@ func newRetryingClient(base *http.Client) *http.Client {
 			baseDelay:   defaultBaseDelay,
 			maxDelay:    defaultMaxDelay,
 			sleep:       sleepContext,
+			jitter:      fullJitter,
 		},
 		Timeout:       base.Timeout,
 		Jar:           base.Jar,
@@ -50,6 +53,7 @@ type retryTransport struct {
 	baseDelay   time.Duration
 	maxDelay    time.Duration
 	sleep       func(context.Context, time.Duration) error
+	jitter      func(time.Duration) time.Duration
 }
 
 func (t *retryTransport) RoundTrip(req *http.Request) (*http.Response, error) {
@@ -73,6 +77,10 @@ func (t *retryTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	if sleep == nil {
 		sleep = sleepContext
 	}
+	jitter := t.jitter
+	if jitter == nil {
+		jitter = fullJitter
+	}
 
 	for attempt := 1; ; attempt++ {
 		reqCopy := req.Clone(req.Context())
@@ -89,7 +97,7 @@ func (t *retryTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 			return resp, nil
 		}
 
-		delay := retryDelay(resp, attempt, baseDelay, maxDelay)
+		delay := retryDelay(resp, attempt, baseDelay, maxDelay, jitter)
 		if resp != nil && resp.Body != nil {
 			_, _ = io.Copy(io.Discard, resp.Body)
 			_ = resp.Body.Close()
@@ -145,7 +153,8 @@ func isRetryableMethod(method string) bool {
 	}
 }
 
-func retryDelay(resp *http.Response, attempt int, baseDelay, maxDelay time.Duration) time.Duration {
+func retryDelay(resp *http.Response, attempt int, baseDelay, maxDelay time.Duration,
+	jitter func(time.Duration) time.Duration) time.Duration {
 	if resp != nil {
 		if delay, ok := parseRetryAfter(resp.Header.Get("Retry-After")); ok {
 			if delay > maxDelay {
@@ -167,6 +176,9 @@ func retryDelay(resp *http.Response, attempt int, baseDelay, maxDelay time.Durat
 	}
 	if delay > maxDelay {
 		return maxDelay
+	}
+	if jitter != nil {
+		delay = jitter(delay)
 	}
 	return delay
 }
@@ -204,4 +216,21 @@ func sleepContext(ctx context.Context, delay time.Duration) error {
 	case <-ctx.Done():
 		return ctx.Err()
 	}
+}
+
+var (
+	jitterRandMu sync.Mutex
+	jitterRand   = rand.New(rand.NewSource(time.Now().UnixNano()))
+)
+
+func fullJitter(maxDelay time.Duration) time.Duration {
+	if maxDelay <= 0 {
+		return 0
+	}
+
+	jitterRandMu.Lock()
+	n := jitterRand.Int63n(int64(maxDelay) + 1)
+	jitterRandMu.Unlock()
+
+	return time.Duration(n)
 }

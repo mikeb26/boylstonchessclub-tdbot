@@ -41,12 +41,15 @@ func TestRetryTransportHonorsRetryAfter(t *testing.T) {
 
 	rt := &retryTransport{
 		next: http.DefaultTransport,
+		baseDelay: 250 * time.Millisecond,
+		maxDelay:  5 * time.Second,
 		sleep: func(_ context.Context, d time.Duration) error {
 			mu.Lock()
 			delays = append(delays, d)
 			mu.Unlock()
 			return nil
 		},
+		jitter: func(d time.Duration) time.Duration { return d },
 	}
 
 	client := &http.Client{Transport: rt}
@@ -95,10 +98,13 @@ func TestRetryTransportUsesBackoffWhenRetryAfterMissing(t *testing.T) {
 	var delays []time.Duration
 	rt := &retryTransport{
 		next: http.DefaultTransport,
+		baseDelay: 250 * time.Millisecond,
+		maxDelay:  5 * time.Second,
 		sleep: func(_ context.Context, d time.Duration) error {
 			delays = append(delays, d)
 			return nil
 		},
+		jitter: func(d time.Duration) time.Duration { return d },
 	}
 
 	client := &http.Client{Transport: rt}
