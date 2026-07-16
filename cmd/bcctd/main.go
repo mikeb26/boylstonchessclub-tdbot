@@ -17,7 +17,8 @@ import (
 
 	"github.com/mikeb26/boylstonchessclub-tdbot/bcc"
 	"github.com/mikeb26/boylstonchessclub-tdbot/internal"
-	"github.com/mikeb26/boylstonchessclub-tdbot/uschess"
+	"github.com/mikeb26/boylstonchessclub-tdbot/uscfutils"
+	uschess "github.com/mikeb26/uschess-go"
 )
 
 //go:embed help.txt
@@ -40,12 +41,16 @@ var commands = map[string]cmdHandler{
 	"estrating":  handleEstRating,
 }
 
-var uschessClient *uschess.Client
+var uschessClient *uschess.ClientWithResponses
 
 func main() {
 	ctx := context.Background()
 
-	uschessClient = uschess.NewClient(ctx)
+	var err error
+	uschessClient, err = uscfutils.NewClient(ctx)
+	if err != nil {
+		log.Fatalf("Error creating US Chess client: %v", err)
+	}
 
 	if len(os.Args) < 2 {
 		usage()
@@ -228,14 +233,15 @@ func handleCrossTable(ctx context.Context, args []string) {
 		os.Exit(1)
 	}
 
-	t, err := uschessClient.FetchCrossTables(ctx, uschess.EventID(*tid))
+	t, err := uschessClient.GetTournament(ctx, uschess.EventID(strconv.Itoa(*tid)))
 	if err != nil {
 		log.Fatalf("Error fetching cross tables %d: %v", *tid, err)
 	}
 
-	for _, xt := range t.CrossTables {
-		output, _ := uschess.BuildOneCrossTableOutput(xt, len(t.CrossTables) > 1, 0)
-		fmt.Printf(output)
+	for i, xt := range t.SectionStandings {
+		output, _ := uscfutils.BuildCrossTableOutput(t.Sections[i], xt,
+			len(t.SectionStandings) > 1, "")
+		fmt.Print(output)
 	}
 }
 
@@ -262,18 +268,18 @@ func handleHistory(ctx context.Context, args []string) {
 	now := time.Now()
 	end := now.AddDate(0, 0, -*days)
 
-	events, err := uschessClient.GetAffiliateEvents(ctx, *aid)
+	events, err := uschessClient.GetAllAffiliateRatedEvents(ctx, uschess.AffiliateID(*aid), nil)
 	if err != nil {
 		log.Fatalf("Error fetching events for aid:%v: %v", *aid, err)
 	}
 
 	// Filter and group events by date
-	eventsByDate := make(map[string][]uschess.Event)
+	eventsByDate := make(map[string][]uschess.RatedEvent)
 	for _, ev := range events {
-		if ev.EndDate.Before(end) {
+		if ev.EndDate.Time.Before(end) {
 			continue
 		}
-		key := ev.EndDate.Format("2006-01-02")
+		key := ev.EndDate.Time.Format("2006-01-02")
 
 		eventsByDate[key] = append(eventsByDate[key], ev)
 	}
@@ -293,7 +299,7 @@ func handleHistory(ctx context.Context, args []string) {
 	for _, d := range dates {
 		fmt.Println(d)
 		for _, ev := range eventsByDate[d] {
-			fmt.Printf("  - %s (uscftid:%v)\n", ev.Name, ev.ID)
+			fmt.Printf("  - %s (uscftid:%v)\n", ev.Name, ev.Id)
 		}
 	}
 	fmt.Printf("\nRun '%s crosstable --uscftid ID' to get results from a specific event\n",
@@ -321,10 +327,11 @@ func handlePlayer(ctx context.Context, args []string) {
 		*eventCount = 5
 	}
 
-	report, err := uschessClient.GetPlayerReport(ctx, uschess.MemID(*memberID),
+	report, err := uscfutils.BuildPlayerReport(ctx, uschessClient,
+		uschess.MemberID(strconv.Itoa(*memberID)),
 		*eventCount)
 	if err != nil {
-		log.Fatalf("Error fetching player %v: %v", memberID, err)
+		log.Fatalf("Error fetching player %v: %v", *memberID, err)
 	}
 
 	fmt.Printf("%v", report)
@@ -349,7 +356,7 @@ func handleEstRating(ctx context.Context, args []string) {
 	}
 
 	// collect opponent USCF ids
-	opponentIds := make([]uschess.MemID, 0)
+	opponentIds := make([]uschess.MemberID, 0)
 	for _, oppUscfId := range fs.Args() {
 		var r int64
 		r, err := strconv.ParseInt(oppUscfId, 10, 64)
@@ -357,13 +364,13 @@ func handleEstRating(ctx context.Context, args []string) {
 			log.Fatalf("Failed to parse opponent USCF id '%v': %v\n", oppUscfId,
 				err)
 		}
-		opponentIds = append(opponentIds, uschess.MemID(r))
+		opponentIds = append(opponentIds, uschess.MemberID(strconv.FormatInt(r, 10)))
 	}
 
 	newRating, err := uschessClient.GetRatingEstimate(ctx,
-		uschess.MemID(*memberID), opponentIds, *score)
+		uschess.MemberID(strconv.Itoa(*memberID)), opponentIds, *score, uschess.RatingTypeR)
 	if err != nil {
 		log.Fatalf("Failed to estimate: %v\n", err)
 	}
-	fmt.Printf("Estimated New Rating: %v\n", int(newRating))
+	fmt.Printf("Estimated New Rating: %v\n", newRating.PostRating)
 }

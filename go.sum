@@ -58,8 +58,8 @@ github.com/juju/gnuflag v0.0.0-20171113085948-2ce1bb71843d/go.mod h1:2PavIy+JPci
 github.com/mattn/go-runewidth v0.0.10/go.mod h1:RAqKPSqVFrSLVXbA8x7dzmKdmGzieGRCM46jaSJTDAk=
 github.com/mikeb26/bwmarrin-discordgo v0.0.0-20250620200528-0a956e8180f7 h1:x62Qg+/vS9Vtd0HHP9xZpaqz8+seoTgqmvBRaAopqME=
 github.com/mikeb26/bwmarrin-discordgo v0.0.0-20250620200528-0a956e8180f7/go.mod h1:NJZpH+1AfhIcyQsPeuBKsUtYrRnjkyu0kIVMCHkZtRY=
-github.com/mikeb26/uschess-go v0.2.2 h1:2k2PptBMBr4w6LMnI0A/kZYN212k6iujpyvjGxh6+gQ=
-github.com/mikeb26/uschess-go v0.2.2/go.mod h1:G76dnCE/DvfO7z1TGYiacycxsxU53zUxWTcSiwmkzDs=
+github.com/mikeb26/uschess-go v0.2.3 h1:vE1YQpDZjTp2lyiRiTU/wPhdpg23uYfmIvNorfOndt4=
+github.com/mikeb26/uschess-go v0.2.3/go.mod h1:G76dnCE/DvfO7z1TGYiacycxsxU53zUxWTcSiwmkzDs=
 github.com/oapi-codegen/nullable v1.1.0 h1:eAh8JVc5430VtYVnq00Hrbpag9PFRGWLjxR1/3KntMs=
 github.com/oapi-codegen/nullable v1.1.0/go.mod h1:KUZ3vUzkmEKY90ksAmit2+5juDIhIZhfDl+0PwOQlFY=
 github.com/oapi-codegen/runtime v1.5.0 h1:aiil4QnH+eiWYSO60eaYZ4aur7sJH3rz6BvT5EBFnxc=

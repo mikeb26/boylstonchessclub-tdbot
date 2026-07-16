@@ -17,7 +17,8 @@ import (
 	"strings"
 
 	"github.com/bwmarrin/discordgo"
-	"github.com/mikeb26/boylstonchessclub-tdbot/uschess"
+	"github.com/mikeb26/boylstonchessclub-tdbot/uscfutils"
+	uschess "github.com/mikeb26/uschess-go"
 
 	_ "embed"
 )
@@ -364,12 +365,16 @@ func registerSlashCommands() {
 	}
 }
 
-var uschessClient *uschess.Client
+var uschessClient *uschess.ClientWithResponses
 
 func main() {
 	go registerSlashCommands()
 
-	uschessClient = uschess.NewClient(context.Background())
+	var err error
+	uschessClient, err = uscfutils.NewClient(context.Background())
+	if err != nil {
+		log.Fatalf("discordbot.main: creating US Chess client: %v", err)
+	}
 	hostname, err := os.Hostname()
 	if err != nil {
 		hostname = "localhost"

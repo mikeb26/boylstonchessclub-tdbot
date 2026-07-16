@@ -13,7 +13,8 @@ require (
 	github.com/aws/smithy-go v1.27.3
 	github.com/bwmarrin/discordgo v0.0.0-00010101000000-000000000000
 	github.com/gregjones/httpcache v0.0.0-20190611155906-901d90724c79
-	github.com/mikeb26/uschess-go v0.2.2
+	github.com/mikeb26/uschess-go v0.2.3
+	github.com/oapi-codegen/runtime v1.5.0
 	golang.org/x/sync v0.22.0
 )
 
@@ -36,7 +37,6 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/sts v1.44.1 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/gorilla/websocket v1.4.2 // indirect
-	github.com/oapi-codegen/runtime v1.5.0 // indirect
 	golang.org/x/crypto v0.49.0 // indirect
 	golang.org/x/net v0.52.0 // indirect
 	golang.org/x/sys v0.42.0 // indirect

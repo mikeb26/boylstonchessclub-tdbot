@@ -18,7 +18,8 @@ import (
 	"github.com/bwmarrin/discordgo"
 
 	"github.com/mikeb26/boylstonchessclub-tdbot/bcc"
-	"github.com/mikeb26/boylstonchessclub-tdbot/uschess"
+	"github.com/mikeb26/boylstonchessclub-tdbot/uscfutils"
+	uschess "github.com/mikeb26/uschess-go"
 )
 
 type TdSubCommand string
@@ -287,7 +288,7 @@ func tdCrossTableCmdHandler(ctx context.Context,
 		log.Printf("discordbot.xt: %v", resp.Data.Content)
 		return resp
 	}
-	t, err := uschessClient.FetchCrossTables(ctx, uschess.EventID(detail.UscfTid))
+	t, err := uschessClient.GetTournament(ctx, uschess.EventID(strconv.FormatInt(int64(detail.UscfTid), 10)))
 	if err != nil {
 		resp.Data.Content = fmt.Sprintf("Error fetching crosstables for eventid %d: %v", eventID, err)
 		log.Printf("discordbot.xt: %v", resp.Data.Content)
@@ -297,17 +298,19 @@ func tdCrossTableCmdHandler(ctx context.Context,
 	var sb strings.Builder
 	sectionList := ""
 	sectionCount := 0
-	for _, xt := range t.CrossTables {
+	for i, xt := range t.SectionStandings {
+		sectionDetail := t.Sections[i]
 		if section != "" &&
-			!strings.Contains(strings.ToLower(xt.SectionName), strings.ToLower(section)) {
+			!strings.Contains(strings.ToLower(sectionDetail.Name), strings.ToLower(section)) {
 			continue
 		}
 		if sectionList == "" {
-			sectionList = xt.SectionName
+			sectionList = sectionDetail.Name
 		} else {
-			sectionList = fmt.Sprintf("%v, %v", sectionList, xt.SectionName)
+			sectionList = fmt.Sprintf("%v, %v", sectionList, sectionDetail.Name)
 		}
-		output, _ := uschess.BuildOneCrossTableOutput(xt, len(t.CrossTables) > 1, 0)
+		output, _ := uscfutils.BuildCrossTableOutput(sectionDetail, xt,
+			len(t.SectionStandings) > 1, "")
 		sb.WriteString(output)
 		sectionCount++
 	}
@@ -530,8 +533,8 @@ func tdPlayerCmdHandler(ctx context.Context,
 		return resp
 	}
 
-	report, err := uschessClient.GetPlayerReport(ctx, uschess.MemID(memID),
-		3 /* eventCount */)
+	report, err := uscfutils.BuildPlayerReport(ctx, uschessClient,
+		uschess.MemberID(strconv.FormatInt(memID, 10)), 3 /* eventCount */)
 	if err != nil {
 		resp.Data.Content = fmt.Sprintf("Error fetching player %v report: %v",
 			memID, err)
@@ -563,12 +566,12 @@ func truncateContent(s string) (string, bool) {
 	return s, truncated
 }
 
-func parseMemIDList(s string) ([]uschess.MemID, error) {
+func parseMemIDList(s string) ([]uschess.MemberID, error) {
 	fields := strings.FieldsFunc(s, func(r rune) bool {
 		return r == ',' || unicode.IsSpace(r)
 	})
 
-	ids := make([]uschess.MemID, 0, len(fields))
+	ids := make([]uschess.MemberID, 0, len(fields))
 	for _, f := range fields {
 		f = strings.TrimSpace(f)
 		if f == "" {
@@ -581,7 +584,7 @@ func parseMemIDList(s string) ([]uschess.MemID, error) {
 		if v <= 0 {
 			return nil, fmt.Errorf("invalid USCF member id %q", f)
 		}
-		ids = append(ids, uschess.MemID(v))
+		ids = append(ids, uschess.MemberID(strconv.FormatInt(v, 10)))
 	}
 
 	return ids, nil
@@ -643,14 +646,14 @@ func tdEstRatingCmdHandler(ctx context.Context,
 	}
 
 	newRating, err := uschessClient.GetRatingEstimate(ctx,
-		uschess.MemID(memID), opponentIDs, score)
+		uschess.MemberID(strconv.FormatInt(memID, 10)), opponentIDs, score, uschess.RatingTypeR)
 	if err != nil {
 		resp.Data.Content = fmt.Sprintf("Failed to estimate rating: %v", err)
 		log.Printf("discordbot.estrating: %v", resp.Data.Content)
 		return resp
 	}
 
-	resp.Data.Content = fmt.Sprintf("Estimated New Rating: %v", int(newRating))
+	resp.Data.Content = fmt.Sprintf("Estimated New Rating: %v", newRating.PostRating)
 
 	if broadcast {
 		resp.Data.Flags = 0

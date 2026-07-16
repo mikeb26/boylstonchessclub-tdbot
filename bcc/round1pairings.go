@@ -13,7 +13,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/mikeb26/boylstonchessclub-tdbot/uschess"
+	"github.com/mikeb26/boylstonchessclub-tdbot/uscfutils"
+	uschess "github.com/mikeb26/uschess-go"
 )
 
 const (
@@ -22,7 +23,7 @@ const (
 )
 
 type uschessRatingProfileLookup func(context.Context,
-	uschess.MemID, bool) (*uschess.Player, error)
+	uschess.MemberID) (*uschess.Player, error)
 
 type section struct {
 	Players  []Entry
@@ -52,9 +53,16 @@ func correctRound1PairingEntries(entries []Entry) []Entry {
 		round1PairingCorrectionTimeout)
 	defer cancel()
 
-	client := uschess.NewClient(ctx)
+	client, err := uscfutils.NewClient(ctx)
+	if err != nil {
+		return append([]Entry(nil), entries...)
+	}
 	return correctRound1PairingEntriesWithLookup(ctx, entries,
-		client.FetchPlayer)
+		func(ctx context.Context, memberID uschess.MemberID) (*uschess.Player, error) {
+			return client.GetPlayer(ctx, memberID, &uschess.GetPlayerOptions{
+				IncludeSupplements: true,
+			})
+		})
 }
 
 func correctRound1PairingEntriesWithLookup(ctx context.Context, entries []Entry,
@@ -88,7 +96,7 @@ func correctRound1PairingEntriesWithLookup(ctx context.Context, entries []Entry,
 				return
 			}
 
-			player, err := lookup(ctx, uschess.MemID(entry.UscfID), false)
+			player, err := lookup(ctx, uschess.MemberID(strconv.Itoa(entry.UscfID)))
 			if err != nil {
 				return
 			}
@@ -112,47 +120,51 @@ func correctRound1PairingEntriesWithLookup(ctx context.Context, entries []Entry,
 func applyUSChessRound1Correction(entry Entry, player *uschess.Player) (Entry,
 	bool) {
 
-	if player == nil || player.MemberID == 0 {
+	if player == nil || player.Id == "" {
 		return entry, false
 	}
 
-	rating := strings.TrimSpace(player.RegSupplement.Rating)
+	rating, supplementDate := regularSupplement(player)
+	rating = strings.TrimSpace(rating)
 	if !isUsableSupplementRating(rating) {
 		return entry, false
 	}
 
 	entry.PrimaryRating = rating
 	entry.PrimaryRatingType = "regular"
-	if !player.RegSupplement.Date.IsZero() {
-		entry.PrimaryRatingDate = player.RegSupplement.Date.Format("2006-01-02")
+	if !supplementDate.IsZero() {
+		entry.PrimaryRatingDate = supplementDate.Format("2006-01-02")
 	}
 
-	firstName, lastName := splitUSChessPlayerName(player.Name)
-	if firstName != "" {
-		entry.FirstName = firstName
-	}
-	if lastName != "" {
-		entry.LastName = lastName
-	}
+	entry.FirstName = player.FirstName
+	entry.LastName = player.LastName
 
 	return entry, true
+}
+
+func regularSupplement(player *uschess.Player) (string, time.Time) {
+	if len(player.RatingSupplements) == 0 {
+		return "<unrated>", time.Time{}
+	}
+	supplement := player.RatingSupplements[0]
+	for _, candidate := range supplement.Ratings {
+		if candidate.RatingType != uschess.RatingTypeR {
+			continue
+		}
+		if candidate.Rating == 0 {
+			return "<unrated>", supplement.RatingSupplementDate.Time
+		} else if candidate.ProvisionalGameCount > 0 {
+			return strconv.FormatInt(int64(candidate.Rating), 10) + "P" +
+				strconv.FormatInt(int64(candidate.ProvisionalGameCount), 10), supplement.RatingSupplementDate.Time
+		}
+		return strconv.FormatInt(int64(candidate.Rating), 10), supplement.RatingSupplementDate.Time
+	}
+	return "<unrated>", supplement.RatingSupplementDate.Time
 }
 
 func isUsableSupplementRating(rating string) bool {
 	rating = strings.TrimSpace(rating)
 	return rating != "" && rating != "<unrated>" && strRatingToInt(rating) > 0
-}
-
-func splitUSChessPlayerName(name string) (string, string) {
-	parts := strings.Fields(strings.TrimSpace(name))
-	if len(parts) == 0 {
-		return "", ""
-	}
-	if len(parts) == 1 {
-		return parts[0], ""
-	}
-
-	return parts[0], strings.Join(parts[1:], " ")
 }
 
 func buildSections(entries []Entry) map[string]section {
