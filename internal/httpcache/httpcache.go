@@ -35,18 +35,32 @@ func NewCachedHttpClient(ctx context.Context, maxAge time.Duration) *http.Client
 	// server responses that might indicate caching shouldn't be done
 	hc.Transport = &HeaderOverrideTransport{
 		wrappedRT: http.DefaultTransport,
-		Response: func(resp *http.Response) error {
-			// Strip any cache-busting headers from origin
+		Response:  cacheResponseFor(maxAge),
+	}
+
+	return &http.Client{Transport: &BypassCachedRateLimitTransport{wrappedRT: hc}}
+}
+
+// cacheResponseFor applies the application's TTL only to successful origin
+// responses. In particular, a 429 must not be cached: uschess-go retries 429
+// responses, but caching one makes every retry read the same cached 429 rather
+// than issue a request after its backoff delay.
+func cacheResponseFor(maxAge time.Duration) func(*http.Response) error {
+	return func(resp *http.Response) error {
+		switch {
+		case resp.StatusCode >= http.StatusOK && resp.StatusCode < http.StatusMultipleChoices:
+			// Strip any cache-busting headers from a successful origin response.
 			resp.Header.Del("Pragma")
 			resp.Header.Del("Expires")
 			resp.Header.Del("Cache-Control")
-			// Enforce the provided TTL
 			resp.Header.Set("Cache-Control", fmt.Sprintf("public, max-age=%d", int(maxAge/time.Second)))
-			return nil
-		},
+		case resp.StatusCode != http.StatusNotModified:
+			// gregjones/httpcache otherwise stores any response that does not
+			// explicitly opt out, including 429 responses.
+			resp.Header.Set("Cache-Control", "no-store")
+		}
+		return nil
 	}
-
-	return &http.Client{Transport: hc}
 }
 
 type HeaderOverrideTransport struct {
@@ -55,6 +69,27 @@ type HeaderOverrideTransport struct {
 
 	// Underlying RoundTripper (e.g. default transport or another decorator)
 	wrappedRT http.RoundTripper
+}
+
+// BypassCachedRateLimitTransport prevents a rate-limit response cached by an
+// earlier version of the client from suppressing an origin request. The cache
+// transport is intentionally below this transport so a fresh cached success is
+// still returned normally.
+type BypassCachedRateLimitTransport struct {
+	wrappedRT http.RoundTripper
+}
+
+func (t *BypassCachedRateLimitTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	resp, err := t.wrappedRT.RoundTrip(req)
+	if err != nil || resp.StatusCode != http.StatusTooManyRequests ||
+		resp.Header.Get(httpcache.XFromCache) != "1" {
+		return resp, err
+	}
+
+	_ = resp.Body.Close()
+	req = req.Clone(req.Context())
+	req.Header.Set("Cache-Control", "no-cache")
+	return t.wrappedRT.RoundTrip(req)
 }
 
 // RoundTrip applies Request and Response hooks around the underlying transport.
