@@ -102,6 +102,7 @@ func GetTournament(eventId int64) (*Tournament, error) {
 	} // else both api and web were successful, prefer the api response
 	// but there are situations where it returns stale data and we should
 	// patch it from data from the web response.
+	combinedSources := false
 	if len(tViaApi.CurrentPairings) > 0 &&
 		len(tViaWeb.CurrentPairings) > 0 &&
 		tViaApi.CurrentPairings[0].RoundNumber <
@@ -109,10 +110,193 @@ func GetTournament(eventId int64) (*Tournament, error) {
 
 		// api is returning stale pairing data, so prefer the web response
 		tViaApi.CurrentPairings = tViaWeb.CurrentPairings
-		tViaApi.source = SourceBoth
+		combinedSources = true
 	}
 
+	// getTournamentViaWeb has already merged the live standings into the web
+	// players. Preserve the API's richer player records while using those live
+	// scores and places.
+	if mergeStandings(tViaApi, tViaWeb) {
+		combinedSources = true
+	}
+	if combinedSources {
+		tViaApi.source = SourceBoth
+	}
 	return tViaApi, nil
+}
+
+// parseStandings extracts the standing tables from a public SwissSys page.
+// The primary section is headed by h1; additional sections are headed by h3.
+func parseStandings(doc *goquery.Document, t *Tournament) error {
+	t.Players = nil
+	doc.Find("div#standings h1, div#standings h3").Each(func(_ int, heading *goquery.Selection) {
+		section := ""
+		if goquery.NodeName(heading) == "h3" {
+			text := strings.TrimSpace(heading.Text())
+			if colon := strings.LastIndex(text, ":"); colon >= 0 {
+				section = strings.TrimSpace(text[colon+1:])
+			}
+		}
+
+		table := heading.Next()
+		for table.Length() > 0 && !table.Is("table") {
+			table = table.Next()
+		}
+		if table.Length() == 0 {
+			return
+		}
+
+		position := 0
+		place := 0
+		priorScore := math.NaN()
+		table.Find("tr").Each(func(_ int, row *goquery.Selection) {
+			cells := row.Find("td")
+			if cells.Length() < 7 || strings.TrimSpace(cells.Eq(0).Text()) == "#" {
+				return
+			}
+
+			score, err := strconv.ParseFloat(strings.TrimSpace(cells.Eq(6).Text()), 64)
+			if err != nil {
+				return
+			}
+			position++
+			if score != priorScore {
+				place = position
+				priorScore = score
+			}
+			t.Players = append(t.Players, Player{
+				DisplayName:    internal.NormalizeName(cells.Eq(2).Text()),
+				PrimaryRating:  strRatingToInt(cells.Eq(4).Text()),
+				CurrentScore:   score,
+				CurrentScoreAG: score,
+				PlaceNumber:    place,
+				SectionName:    section,
+			})
+		})
+	})
+
+	return nil
+}
+
+// mergeStandings copies scores and places onto the richer tournament records
+// only when the incoming standings have a higher total score. This lets us use
+// the source that has completed more games: public SwissSys standings may be
+// newer than the API, but the API can also be more current.
+//
+// Section names on the primary SwissSys table are omitted, so players are
+// matched by name when it occurs only once in the event.
+func mergeStandings(t, standings *Tournament) bool {
+	if tournamentScoreTotal(standings) <= tournamentScoreTotal(t) {
+		return false
+	}
+	return applyStandings(t, standings)
+}
+
+// applyStandings copies standings onto a tournament without comparing their
+// aggregate score. It is used while constructing the website result: the
+// SwissSys standings page is the authoritative score source for that result,
+// whereas pairing parsing is only a fallback and can fail to associate a
+// player whose displayed name differs from the entries page.
+func applyStandings(t, standings *Tournament) bool {
+	playersByName := make(map[string][]*Player)
+	for i := range t.Players {
+		player := &t.Players[i]
+		key := normalizedStandingName(player.DisplayName)
+		playersByName[key] = append(playersByName[key], player)
+	}
+
+	merged := false
+	for _, standing := range standings.Players {
+		matches := playersByName[normalizedStandingName(standing.DisplayName)]
+		if standing.SectionName != "" {
+			var sectionMatches []*Player
+			for _, player := range matches {
+				if strings.EqualFold(player.SectionName, standing.SectionName) {
+					sectionMatches = append(sectionMatches, player)
+				}
+			}
+			// Entries pages do not always identify a player's section. In that
+			// case, retain an unambiguous name match rather than discarding it
+			// simply because the SwissSys table does identify its section.
+			if len(sectionMatches) > 0 {
+				matches = sectionMatches
+			}
+		}
+		if len(matches) != 1 {
+			matches = findSimilarNameMatches(t.Players, standing)
+		}
+		if len(matches) != 1 {
+			continue
+		}
+
+		player := matches[0]
+		player.CurrentScore = standing.CurrentScore
+		player.CurrentScoreAG = standing.CurrentScoreAG
+		player.PlaceNumber = standing.PlaceNumber
+		merged = true
+	}
+	return merged
+}
+
+// tournamentScoreTotal is a source-independent indication of tournament
+// progress. Every completed chess game adds one point across its two players,
+// so the larger total has more up-to-date results without relying on an
+// individual player name being present in both sources.
+func tournamentScoreTotal(t *Tournament) float64 {
+	var total float64
+	for _, player := range t.Players {
+		total += player.CurrentScore
+	}
+	return total
+}
+
+func normalizedStandingName(name string) string {
+	return strings.ToLower(internal.NormalizeName(name))
+}
+
+// findSimilarNameMatches handles minor differences between the registration
+// data and SwissSys, such as middle names, nicknames, or a transposed surname.
+// It only returns a match when the abbreviated first and last names are unique
+// in the relevant section.
+func findSimilarNameMatches(players []Player, standing Player) []*Player {
+	standingName := strings.Fields(normalizedStandingName(standing.DisplayName))
+	if len(standingName) != 2 {
+		return nil
+	}
+
+	var matches []*Player
+	for i := range players {
+		player := &players[i]
+		// Entries pages may omit section names. Exclude only players that have
+		// an explicitly different section, leaving an otherwise unambiguous
+		// name match available to merge.
+		if standing.SectionName != "" && player.SectionName != "" &&
+			!strings.EqualFold(player.SectionName, standing.SectionName) {
+			continue
+		}
+		playerFirst := strings.ToLower(player.FirstName)
+		playerLast := strings.ToLower(player.LastName)
+		if playerFirst == "" || playerLast == "" {
+			name := strings.Fields(player.DisplayName)
+			if len(name) < 2 {
+				continue
+			}
+			playerFirst = strings.ToLower(name[0])
+			playerLast = strings.ToLower(name[len(name)-1])
+		}
+		if playerFirst == standingName[0] && playerLast == standingName[1] {
+			matches = append(matches, player)
+			continue
+		}
+		if playerLast == standingName[1] {
+			matches = append(matches, player)
+			continue
+		}
+		if playerFirst == standingName[0] && playerLast[0] == standingName[1][0] {
+			matches = append(matches, player)
+		}
+	}
+	return matches
 }
 
 // getTournamentViaApi fetches the tournament data (players and pairings) for a
@@ -164,17 +348,18 @@ func getTournamentViaApi(eventId int64) (*Tournament, error) {
 }
 
 // getTournamentViaWeb fetches the tournament data by scraping the public website
-// pages: entries and pairings for the given eventId.
+// pages: entries, pairings, and standings for the given eventId.
 func getTournamentViaWeb(eventId int64) (*Tournament, error) {
 	// Prepare URLs
 	entriesURL := fmt.Sprintf("https://boylstonchess.org/tournament/entries/%d", eventId)
 	pairingsURL := fmt.Sprintf("https://boylstonchess.org/files/event/%d/pairings", eventId)
+	standingsURL := fmt.Sprintf("https://boylstonchess.org/files/event/%d/standings", eventId)
 
-	// Concurrent fetch
+	// Fetch all public tournament pages concurrently.
 	var wg sync.WaitGroup
-	var entriesDoc, pairingsDoc *goquery.Document
-	var errEntries, errPairings error
-	wg.Add(2)
+	var entriesDoc, pairingsDoc, standingsDoc *goquery.Document
+	var errEntries, errPairings, errStandings error
+	wg.Add(3)
 	go func() {
 		defer wg.Done()
 		entriesDoc, errEntries = fetchDoc(entriesURL)
@@ -182,6 +367,10 @@ func getTournamentViaWeb(eventId int64) (*Tournament, error) {
 	go func() {
 		defer wg.Done()
 		pairingsDoc, errPairings = fetchDoc(pairingsURL)
+	}()
+	go func() {
+		defer wg.Done()
+		standingsDoc, errStandings = fetchDoc(standingsURL)
 	}()
 	wg.Wait()
 
@@ -203,6 +392,16 @@ func getTournamentViaWeb(eventId int64) (*Tournament, error) {
 		return nil, fmt.Errorf("unable to parse pairings: %w", err)
 	}
 
+	// The standings page is published by SwissSys and can be newer than the
+	// beta API. It is optional so a missing or malformed page does not make the
+	// otherwise useful entries and pairings unavailable.
+	if errStandings == nil {
+		standings := &Tournament{}
+		if err := parseStandings(standingsDoc, standings); err == nil && len(standings.Players) > 0 {
+			applyStandings(tourney, standings)
+		}
+	}
+
 	return tourney, nil
 }
 
@@ -222,12 +421,17 @@ func parsePlayers(doc *goquery.Document, t *Tournament) error {
 			rating = r
 		}
 		uscfID, _ := strconv.Atoi(strings.TrimSpace(cells.Eq(3).Text()))
+		section := ""
+		if cells.Length() >= 5 {
+			section = strings.TrimSpace(cells.Eq(4).Text())
+		}
 
 		p := Player{
 			DisplayName:   internal.NormalizeName(name),
 			PairingNumber: num,
 			PrimaryRating: rating,
 			UscfID:        uscfID,
+			SectionName:   section,
 		}
 		parts := strings.Fields(p.DisplayName)
 		if len(parts) > 0 {

@@ -26,20 +26,26 @@ func BuildStandingsOutput(t *Tournament) string {
 
 	sb.WriteString(fmt.Sprintf("Standings (via %v):\n\n", t.source.String()))
 
-	for sec, players := range secPlayers {
+	for _, sec := range sectionNames {
+		players := secPlayers[sec]
 		sort.Slice(players, func(i, j int) bool {
+			if players[i].CurrentScoreAG != players[j].CurrentScoreAG {
+				return players[i].CurrentScoreAG > players[j].CurrentScoreAG
+			}
 			return players[i].PlaceNumber < players[j].PlaceNumber
 		})
 
 		type row struct{ rank, player, score string }
 		var rows []row
 		priorScore := -1.0
+		place := 0
 		for idx, p := range players {
 			var rank string
 			if idx != 0 && p.CurrentScoreAG == priorScore {
 				rank = ""
 			} else {
-				rank = fmt.Sprintf("%v.", p.PlaceNumber)
+				place = idx + 1
+				rank = fmt.Sprintf("%v.", place)
 				priorScore = p.CurrentScoreAG
 			}
 			r := row{
